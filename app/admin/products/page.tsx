@@ -14,7 +14,7 @@ function statusClass(status: ProductStatus) {
 }
 
 export default function AdminProductsPage() {
-  const { products, deleteProduct, setProductStatus } = useCatalog();
+  const { products, deleteProduct, setProductStatus, isLoading, error } = useCatalog();
   const [query, setQuery] = useState("");
   const filteredProducts = products.filter((product) =>
     [product.name, product.category, product.sku, product.vendor, product.marketplace].join(" ").toLowerCase().includes(query.toLowerCase())
@@ -41,7 +41,11 @@ export default function AdminProductsPage() {
             </label>
           </div>
 
-          {filteredProducts.length ? (
+          {isLoading ? (
+            <div className="p-10 text-center text-sm font-semibold text-neutral-500">Loading database products...</div>
+          ) : error ? (
+            <div className="p-10 text-center text-sm font-semibold text-rose-600">{error}</div>
+          ) : filteredProducts.length ? (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px] text-left text-sm">
                 <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
@@ -69,7 +73,7 @@ export default function AdminProductsPage() {
                       <td className="px-4 py-3">
                         <select
                           value={product.status}
-                          onChange={(event) => setProductStatus(product.id, event.target.value as ProductStatus)}
+                          onChange={(event) => void setProductStatus(product.id, event.target.value as ProductStatus)}
                           className={`rounded-full border-0 px-3 py-1 text-xs font-bold outline-none ${statusClass(product.status)}`}
                         >
                           <option value="Active">Active</option>
@@ -93,7 +97,7 @@ export default function AdminProductsPage() {
                           <Link href={`/admin/products/${product.id}/edit`} className="rounded-lg border border-black/10 px-3 py-2 text-xs font-bold hover:bg-white">
                             Edit
                           </Link>
-                          <button onClick={() => deleteProduct(product.id)} className="grid h-9 w-9 place-items-center rounded-lg border border-black/10 text-rose-600 hover:bg-rose-50" aria-label="Delete product">
+                          <button onClick={() => void deleteProduct(product.id)} className="grid h-9 w-9 place-items-center rounded-lg border border-black/10 text-rose-600 hover:bg-rose-50" aria-label="Delete product">
                             <Trash2 size={16} />
                           </button>
                         </div>

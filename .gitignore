@@ -13,3 +13,7 @@ build/
 # Accidental empty clone inside the real project root.
 ecommerce-portfolio/
 .env.local
+
+.env*.local
+
+/lib/generated/prisma

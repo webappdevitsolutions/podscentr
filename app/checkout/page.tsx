@@ -6,15 +6,7 @@ import { PackageCheck, Smartphone, Truck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LinkButton } from "@/components/Button";
 import { useCart } from "@/hooks/useCart";
-import {
-  deliveryChargeTable,
-  deliveryMethodDetails,
-  makeOrderId,
-  saveOrder,
-  toOrderItems,
-  type DeliveryMethodId,
-  type PaymentMethod
-} from "@/lib/orders";
+import { deliveryChargeTable, deliveryMethodDetails, type DeliveryMethodId, type PaymentMethod } from "@/lib/orders";
 import { formatCurrency } from "@/lib/utils";
 
 const paymentMethods: Array<{ Icon: typeof Smartphone; label: PaymentMethod }> = [
@@ -23,13 +15,15 @@ const paymentMethods: Array<{ Icon: typeof Smartphone; label: PaymentMethod }> =
 ];
 
 const deliveryMethods = [
-  { id: "standard", title: "Standard Delivery", text: "3-5 business days", price: "Free over ₹999" },
-  { id: "express", title: "Express Delivery", text: "1-2 business days", price: "₹99" }
+  { id: "standard", title: "Standard Delivery" },
+  { id: "express", title: "Express Delivery" }
 ];
 
 declare global {
   interface Window {
-    Razorpay: new (options: Record<string, unknown>) => { open: () => void };
+    Cashfree?: (options: { mode: "sandbox" | "production" }) => {
+      checkout: (options: { paymentSessionId: string; redirectTarget?: "_self" | "_blank" | "_top" | "_modal" }) => Promise<unknown>;
+    };
   }
 }
 
@@ -38,15 +32,13 @@ const indianStates = ["Delhi", "Maharashtra", "Uttar Pradesh", "Karnataka", "Guj
 type ShippingAddress = {
   country: string;
   fullName: string;
-  mobile: string;
+  phone: string;
   email: string;
   pinCode: string;
-  building: string;
-  area: string;
-  landmark: string;
+  addressLine1: string;
+  addressLine2: string;
   city: string;
   state: string;
-  fullAddress: string;
 };
 
 type AddressErrors = Partial<Record<keyof ShippingAddress, string>>;
@@ -54,15 +46,13 @@ type AddressErrors = Partial<Record<keyof ShippingAddress, string>>;
 const initialAddress: ShippingAddress = {
   country: "India",
   fullName: "",
-  mobile: "",
+  phone: "",
   email: "",
   pinCode: "",
-  building: "",
-  area: "",
-  landmark: "",
+  addressLine1: "",
+  addressLine2: "",
   city: "",
-  state: "",
-  fullAddress: ""
+  state: ""
 };
 
 function validateAddress(address: ShippingAddress) {
@@ -70,15 +60,14 @@ function validateAddress(address: ShippingAddress) {
 
   if (!address.country) errors.country = "Country is required";
   if (!address.fullName.trim()) errors.fullName = "Full name is required";
-  if (!/^\d{10}$/.test(address.mobile)) errors.mobile = "Enter valid mobile number";
+  if (!address.phone.trim()) errors.phone = "Phone number is required";
+  else if (!/^\d{10}$/.test(address.phone)) errors.phone = "Enter a valid 10-digit phone number";
   if (!address.email.trim()) errors.email = "Email is required";
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.email)) errors.email = "Enter valid email address";
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.email)) errors.email = "Enter a valid email address";
   if (!/^\d{6}$/.test(address.pinCode)) errors.pinCode = "PIN code must be 6 digits";
-  if (!address.building.trim()) errors.building = "Flat / house details are required";
-  if (!address.area.trim()) errors.area = "Area / street is required";
-  if (!address.city.trim()) errors.city = "Town / city is required";
+  if (!address.addressLine1.trim()) errors.addressLine1 = "Address line 1 is required";
+  if (!address.city.trim()) errors.city = "City is required";
   if (!address.state) errors.state = "State is required";
-  if (!address.fullAddress.trim()) errors.fullAddress = "Full address is required";
 
   return errors;
 }
@@ -93,6 +82,7 @@ export default function CheckoutPage() {
   const [addressTouched, setAddressTouched] = useState<Partial<Record<keyof ShippingAddress, boolean>>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const deliveryCharge = deliveryChargeTable[deliveryMethod][paymentMethod];
   const selectedDelivery = deliveryMethodDetails[deliveryMethod];
@@ -102,103 +92,135 @@ export default function CheckoutPage() {
   const addressErrors = useMemo(() => validateAddress(address), [address]);
   const canPlaceOrder = items.length > 0 && Object.keys(addressErrors).length === 0 && Boolean(paymentMethod) && !isProcessing;
 
-  function createSavedOrder() {
-    return {
-      id: makeOrderId(),
-      date: new Date().toISOString(),
-      customerName: address.fullName,
-      customerMobile: address.mobile,
+  const checkoutPayload = useMemo(
+    () => ({
+      customer: {
+        name: address.fullName,
+        email: address.email,
+        phone: address.phone
+      },
+      shippingAddress: {
+        addressLine1: address.addressLine1,
+        addressLine2: address.addressLine2,
+        city: address.city,
+        state: address.state,
+        pinCode: address.pinCode,
+        country: address.country
+      },
+      cart: items.map((item) => ({
+        id: item.id,
+        productId: item.product.id,
+        name: item.product.name,
+        quantity: item.quantity,
+        price: item.product.price,
+        size: item.size,
+        color: item.color
+      })),
       paymentMethod,
-      deliveryMethod: selectedDelivery.title,
-      deliveryTime: selectedDelivery.time,
-      deliveryCharge,
-      subtotal,
+      deliveryMethod,
       tax,
-      discount,
-      total,
-      finalAmount: total,
-      items: toOrderItems(items)
-    };
+      discount
+    }),
+    [address, deliveryMethod, discount, items, paymentMethod, tax]
+  );
+
+  function markAllAddressTouched() {
+    setAddressTouched({
+      country: true,
+      fullName: true,
+      phone: true,
+      email: true,
+      pinCode: true,
+      addressLine1: true,
+      city: true,
+      state: true
+    });
+  }
+
+  async function createCodOrder() {
+    const response = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(checkoutPayload)
+    });
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "Could not place COD order.");
+    }
+
+    return result.order?.id as string | undefined;
+  }
+
+  async function createCashfreeOrder() {
+    const response = await fetch("/api/payments/cashfree/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(checkoutPayload)
+    });
+    const result = await response.json();
+
+    if (!response.ok || !result.payment_session_id || !result.order_id) {
+      throw new Error(result.error || "Could not start Cashfree payment.");
+    }
+
+    return result as { payment_session_id: string; order_id: string };
+  }
+
+  async function verifyCashfreeOrder(orderId: string) {
+    const response = await fetch("/api/payments/cashfree/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_id: orderId })
+    });
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "Could not verify payment.");
+    }
+
+    return Boolean(result.verified);
   }
 
   async function handlePlaceOrder() {
     setPaymentError("");
+    markAllAddressTouched();
 
-    if (paymentMethod === "Cash on Delivery") {
-      saveOrder(createSavedOrder());
-      clearCart();
-      router.push("/order-success");
-      return;
-    }
+    if (!canPlaceOrder) return;
 
     setIsProcessing(true);
     try {
-      const orderResponse = await fetch("/api/razorpay/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: total,
-          notes: {
-            customerName: address.fullName,
-            mobile: address.mobile,
-            paymentMethod,
-            deliveryMethod: selectedDelivery.title,
-            deliveryCharge,
-            finalAmount: total
-          }
-        })
-      });
-      const orderData = await orderResponse.json();
-
-      if (!orderResponse.ok || !orderData.order) {
-        setPaymentError(orderData.error || "Could not start payment. Please try again.");
-        setIsProcessing(false);
+      if (paymentMethod === "Cash on Delivery") {
+        const orderId = await createCodOrder();
+        clearCart();
+        router.push(`/order-success${orderId ? `?order_id=${orderId}` : ""}`);
         return;
       }
 
-      const razorpay = new window.Razorpay({
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: orderData.order.amount,
-        currency: "INR",
-        name: "Podscentra",
-        description: "Order payment",
-        order_id: orderData.order.id,
-        prefill: {
-          name: address.fullName,
-          email: address.email,
-          contact: address.mobile
-        },
-        theme: { color: "#7c3aed" },
-        handler: async (response: {
-          razorpay_order_id: string;
-          razorpay_payment_id: string;
-          razorpay_signature: string;
-        }) => {
-          const verifyResponse = await fetch("/api/razorpay/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(response)
-          });
-          const verifyData = await verifyResponse.json();
+      if (!window.Cashfree) {
+        throw new Error("Cashfree checkout is still loading. Please try again in a moment.");
+      }
 
-          if (verifyData.verified) {
-            saveOrder(createSavedOrder());
-            clearCart();
-            router.push("/order-success");
-          } else {
-            setPaymentError("Payment could not be verified. If money was deducted, it will be refunded automatically.");
-          }
-          setIsProcessing(false);
-        },
-        modal: {
-          ondismiss: () => setIsProcessing(false)
-        }
+      const cashfreeMode = process.env.NEXT_PUBLIC_CASHFREE_MODE === "production" ? "production" : "sandbox";
+      const { payment_session_id, order_id } = await createCashfreeOrder();
+      const cashfree = window.Cashfree({ mode: cashfreeMode });
+
+      await cashfree.checkout({
+        paymentSessionId: payment_session_id,
+        redirectTarget: "_modal"
       });
 
-      razorpay.open();
+      const verified = await verifyCashfreeOrder(order_id);
+      if (!verified) {
+        throw new Error("Payment was not confirmed by Cashfree. If money was deducted, it will be reconciled automatically.");
+      }
+
+      clearCart();
+      router.push(`/order-success?order_id=${order_id}`);
     } catch (error) {
       console.error("Checkout error:", error);
-      setPaymentError("Something went wrong starting payment. Please try again.");
+      setPaymentError(error instanceof Error ? error.message : "Something went wrong. Please try again.");
+    } finally {
       setIsProcessing(false);
     }
   }
@@ -220,7 +242,7 @@ export default function CheckoutPage() {
 
   function shouldShowAddressError(field: keyof ShippingAddress) {
     const hasTypedValue = Boolean(address[field]);
-    const validatesWhileTyping = field === "mobile" || field === "pinCode" || field === "email";
+    const validatesWhileTyping = field === "phone" || field === "pinCode" || field === "email";
     return Boolean(addressErrors[field] && (addressTouched[field] || (validatesWhileTyping && hasTypedValue)));
   }
 
@@ -244,45 +266,31 @@ export default function CheckoutPage() {
         <h1 className="text-5xl font-black">Checkout</h1>
         <div className="mt-6 grid gap-6">
           <div className="rounded-3xl bg-white p-6 dark:bg-white/5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-2xl font-black">Shipping address</h2>
-            </div>
+            <h2 className="text-2xl font-black">Contact and shipping</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <div className="grid gap-1">
-                <select value={address.country} onChange={(event) => setAddressField("country", event.target.value)} onBlur={() => markAddressTouched("country")} className={addressInputClass("country")}>
-                  <option value="India">India</option>
-                </select>
-                {addressError("country")}
-              </div>
-              <div className="grid gap-1">
-                <input value={address.fullName} onChange={(event) => setAddressField("fullName", event.target.value)} onBlur={() => markAddressTouched("fullName")} placeholder="Full Name" className={addressInputClass("fullName")} />
+                <input value={address.fullName} onChange={(event) => setAddressField("fullName", event.target.value)} onBlur={() => markAddressTouched("fullName")} placeholder="Full name" className={addressInputClass("fullName")} />
                 {addressError("fullName")}
               </div>
               <div className="grid gap-1">
-                <input value={address.mobile} onChange={(event) => setAddressField("mobile", event.target.value.replace(/\D/g, "").slice(0, 10))} onBlur={() => markAddressTouched("mobile")} inputMode="numeric" placeholder="Mobile Number" className={addressInputClass("mobile")} />
-                {addressError("mobile")}
-              </div>
-              <div className="grid gap-1">
-                <input value={address.email} onChange={(event) => setAddressField("email", event.target.value)} onBlur={() => markAddressTouched("email")} type="email" placeholder="Email Address" className={addressInputClass("email")} />
+                <input value={address.email} onChange={(event) => setAddressField("email", event.target.value)} onBlur={() => markAddressTouched("email")} type="email" placeholder="Email address" className={addressInputClass("email")} />
                 {addressError("email")}
               </div>
               <div className="grid gap-1">
-                <input value={address.pinCode} onChange={(event) => setAddressField("pinCode", event.target.value.replace(/\D/g, "").slice(0, 6))} onBlur={() => markAddressTouched("pinCode")} inputMode="numeric" placeholder="PIN Code" className={addressInputClass("pinCode")} />
+                <input value={address.phone} onChange={(event) => setAddressField("phone", event.target.value.replace(/\D/g, "").slice(0, 10))} onBlur={() => markAddressTouched("phone")} inputMode="numeric" placeholder="Phone number" className={addressInputClass("phone")} />
+                {addressError("phone")}
+              </div>
+              <div className="grid gap-1">
+                <input value={address.pinCode} onChange={(event) => setAddressField("pinCode", event.target.value.replace(/\D/g, "").slice(0, 6))} onBlur={() => markAddressTouched("pinCode")} inputMode="numeric" placeholder="PIN code" className={addressInputClass("pinCode")} />
                 {addressError("pinCode")}
               </div>
-              <div className="grid gap-1">
-                <input value={address.building} onChange={(event) => setAddressField("building", event.target.value)} onBlur={() => markAddressTouched("building")} placeholder="Flat / House No / Building / Apartment" className={addressInputClass("building")} />
-                {addressError("building")}
+              <div className="grid gap-1 sm:col-span-2">
+                <input value={address.addressLine1} onChange={(event) => setAddressField("addressLine1", event.target.value)} onBlur={() => markAddressTouched("addressLine1")} placeholder="Address line 1" className={addressInputClass("addressLine1")} />
+                {addressError("addressLine1")}
               </div>
+              <input value={address.addressLine2} onChange={(event) => setAddressField("addressLine2", event.target.value)} placeholder="Address line 2 (optional)" className="focus-ring min-h-12 rounded-2xl border border-black/10 bg-transparent px-4 dark:border-white/10" />
               <div className="grid gap-1">
-                <input value={address.area} onChange={(event) => setAddressField("area", event.target.value)} onBlur={() => markAddressTouched("area")} placeholder="Area / Street / Sector / Village" className={addressInputClass("area")} />
-                {addressError("area")}
-              </div>
-              <div className="grid gap-1">
-                <input value={address.landmark} onChange={(event) => setAddressField("landmark", event.target.value)} placeholder="Landmark (Optional)" className="focus-ring min-h-12 rounded-2xl border border-black/10 bg-transparent px-4 dark:border-white/10" />
-              </div>
-              <div className="grid gap-1">
-                <input value={address.city} onChange={(event) => setAddressField("city", event.target.value)} onBlur={() => markAddressTouched("city")} placeholder="Town / City" className={addressInputClass("city")} />
+                <input value={address.city} onChange={(event) => setAddressField("city", event.target.value)} onBlur={() => markAddressTouched("city")} placeholder="City" className={addressInputClass("city")} />
                 {addressError("city")}
               </div>
               <div className="grid gap-1">
@@ -294,18 +302,15 @@ export default function CheckoutPage() {
                 </select>
                 {addressError("state")}
               </div>
-              <div className="grid gap-1 sm:col-span-2">
-                <textarea value={address.fullAddress} onChange={(event) => setAddressField("fullAddress", event.target.value)} onBlur={() => markAddressTouched("fullAddress")} placeholder="Full Address" className={`focus-ring min-h-28 rounded-2xl border bg-transparent p-4 ${shouldShowAddressError("fullAddress") ? "border-red-500" : "border-black/10 dark:border-white/10"}`} />
-                {addressError("fullAddress")}
+              <div className="grid gap-1">
+                <select value={address.country} onChange={(event) => setAddressField("country", event.target.value)} onBlur={() => markAddressTouched("country")} className={addressInputClass("country")}>
+                  <option value="India">India</option>
+                </select>
+                {addressError("country")}
               </div>
             </div>
           </div>
-          <div className="rounded-3xl bg-white p-6 dark:bg-white/5">
-            <h2 className="text-2xl font-black">Billing address</h2>
-            <label className="mt-4 flex items-center gap-3 text-sm font-bold">
-              <input type="checkbox" defaultChecked className="h-4 w-4 accent-violet-600" /> Same as shipping address
-            </label>
-          </div>
+
           <div className="rounded-3xl bg-white p-6 dark:bg-white/5">
             <h2 className="text-2xl font-black">Delivery method</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -313,15 +318,7 @@ export default function CheckoutPage() {
                 <button
                   key={id}
                   type="button"
-                  role="button"
-                  tabIndex={0}
                   onClick={() => setDeliveryMethod(id as DeliveryMethodId)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      setDeliveryMethod(id as DeliveryMethodId);
-                    }
-                  }}
                   className={`focus-ring cursor-pointer rounded-2xl border p-4 text-left transition hover:border-accent dark:border-white/10 ${
                     deliveryMethod === id ? "border-accent bg-violet-50 shadow-lg shadow-violet-500/10 dark:bg-white/10" : "border-black/10"
                   }`}
@@ -344,9 +341,10 @@ export default function CheckoutPage() {
               ))}
             </div>
           </div>
+
           <div className="rounded-3xl bg-white p-6 dark:bg-white/5">
-            <h2 className="text-2xl font-black">Payment section</h2>
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <h2 className="text-2xl font-black">Payment</h2>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {paymentMethods.map(({ Icon, label }) => (
                 <button
                   key={label}
@@ -362,12 +360,12 @@ export default function CheckoutPage() {
             </div>
             {paymentMethod === "Online Payment" ? (
               <div className="mt-5 rounded-2xl border border-black/10 p-4 text-sm leading-6 text-neutral-500 transition dark:border-white/10 dark:text-neutral-400">
-                You&apos;ll be securely redirected to Razorpay to pay by UPI, card, netbanking, or wallet. Podscentra never sees or stores your card details.
+                You&apos;ll pay securely through Cashfree. Podscentra never sees or stores your card, UPI, or netbanking details.
               </div>
             ) : null}
             {paymentMethod === "Cash on Delivery" ? (
               <div className="mt-5 rounded-2xl border border-black/10 p-4 text-sm leading-6 text-neutral-500 transition dark:border-white/10 dark:text-neutral-400">
-                Pay safely when your order arrives. Keep the exact amount ready for a faster handoff.
+                Pay when your order arrives. COD delivery charges update automatically in the summary.
               </div>
             ) : null}
             {paymentError ? (
@@ -376,13 +374,14 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
+
+      <Script src="https://sdk.cashfree.com/js/v3/cashfree.js" strategy="lazyOnload" />
       <aside className="h-fit rounded-3xl bg-white p-6 shadow-luxury dark:bg-white/5">
         <h2 className="text-2xl font-black">Order summary</h2>
         <div className="mt-5 grid gap-3">
           {items.map((item) => (
             <div key={item.id} className="flex justify-between gap-3 text-sm">
-              <span>{item.product.name} × {item.quantity}</span>
+              <span>{item.product.name} x {item.quantity}</span>
               <b>{formatCurrency(item.product.price * item.quantity)}</b>
             </div>
           ))}
@@ -403,7 +402,7 @@ export default function CheckoutPage() {
           onClick={handlePlaceOrder}
           className="focus-ring mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent px-5 text-sm font-bold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isProcessing ? "Processing…" : paymentMethod === "Cash on Delivery" ? "Place order" : `Pay ${formatCurrency(total)}`}
+          {isProcessing ? "Processing..." : paymentMethod === "Cash on Delivery" ? "Place order" : `Pay ${formatCurrency(total)}`}
         </button>
         <LinkButton href="/cart" variant="ghost" className="mt-3 w-full">Back to cart</LinkButton>
       </aside>
@@ -414,7 +413,7 @@ export default function CheckoutPage() {
           onClick={handlePlaceOrder}
           className="focus-ring flex min-h-12 w-full items-center justify-center rounded-full bg-accent font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isProcessing ? "Processing…" : paymentMethod === "Cash on Delivery" ? "Place order" : `Pay ${formatCurrency(total)}`}
+          {isProcessing ? "Processing..." : paymentMethod === "Cash on Delivery" ? "Place order" : `Pay ${formatCurrency(total)}`}
         </button>
       </div>
     </section>

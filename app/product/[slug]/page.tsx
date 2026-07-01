@@ -7,8 +7,17 @@ import { useCatalog } from "@/hooks/useCatalog";
 
 export default function ProductPage() {
   const params = useParams<{ slug: string }>();
-  const { activeProducts } = useCatalog();
+  const { activeProducts, isLoading } = useCatalog();
   const product = activeProducts.find((item) => item.slug === params.slug);
+
+  if (isLoading) {
+    return (
+      <section className="mx-auto max-w-3xl px-4 py-20 text-center sm:px-6 lg:px-8">
+        <h1 className="text-3xl font-bold">Loading product...</h1>
+        <p className="mt-3 text-neutral-500 dark:text-neutral-400">Fetching the latest catalog from the database.</p>
+      </section>
+    );
+  }
 
   if (!product) {
     return (

@@ -2,7 +2,6 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { type Product, type ProductVariant } from "@/data/products";
-import catalogSeed from "@/data/catalog-products.json";
 
 export type ProductStatus = "Active" | "Draft" | "Archived";
 export type Marketplace = "Amazon" | "Flipkart" | "Meesho" | "Myntra" | "Other" | "Manual";
@@ -47,161 +46,111 @@ type CatalogContextValue = {
   products: CatalogProduct[];
   activeProducts: CatalogProduct[];
   categories: string[];
-  addProduct: (product: Partial<CatalogProduct>) => CatalogProduct;
-  updateProduct: (id: string, updates: Partial<CatalogProduct>) => void;
-  deleteProduct: (id: string) => void;
-  setProductStatus: (id: string, status: ProductStatus) => void;
-  adjustStock: (id: string, stock: number) => void;
-  importProducts: (products: Partial<CatalogProduct>[]) => void;
+  isLoading: boolean;
+  error: string;
+  refreshProducts: () => Promise<void>;
+  addProduct: (product: Partial<CatalogProduct>) => Promise<CatalogProduct>;
+  updateProduct: (id: string, updates: Partial<CatalogProduct>) => Promise<CatalogProduct>;
+  deleteProduct: (id: string) => Promise<void>;
+  setProductStatus: (id: string, status: ProductStatus) => Promise<void>;
+  adjustStock: (id: string, stock: number) => Promise<void>;
+  importProducts: (products: Partial<CatalogProduct>[]) => Promise<CatalogProduct[]>;
 };
-
-const catalogStorageKey = "podscentra-catalog-products";
-const oldCrmStorageKey = "podscentra-crm-data";
-const placeholderImage = "/product-placeholder.svg";
 
 const CatalogContext = createContext<CatalogContextValue | null>(null);
 
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || `product-${Date.now()}`;
-}
-
-function makeId() {
-  return `PRD-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-}
-
-function normalizeProduct(input: Partial<CatalogProduct>): CatalogProduct {
-  const name = input.name?.trim() || "Untitled Product";
-  const gallery = input.gallery?.filter(Boolean).length ? input.gallery.filter(Boolean) : [];
-  const image = gallery[0] || input.image || input.imageUrl || placeholderImage;
-  const price = Number(input.price ?? 0);
-  const oldPrice = Number(input.oldPrice ?? input.compareAtPrice ?? 0) || undefined;
-  const supplier = input.supplier || input.vendor || "";
-
-  return {
-    id: input.id || makeId(),
-    slug: input.slug || slugify(name),
-    name,
-    category: input.category || "Uncategorized",
-    price,
-    oldPrice,
-    compareAtPrice: oldPrice,
-    cost: Number(input.cost || 0),
-    stock: Number(input.stock || 0),
-    reorderLevel: Number(input.reorderLevel || 5),
-    sku: input.sku || `${slugify(name).slice(0, 12).toUpperCase()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`,
-    barcode: input.barcode || "",
-    status: input.status || "Draft",
-    supplier,
-    vendor: input.vendor || supplier,
-    productType: input.productType || "",
-    collections: input.collections || "",
-    tags: input.tags || "",
-    marketplace: input.marketplace || "Manual",
-    sourceUrl: input.sourceUrl || "",
-    externalId: input.externalId || "",
-    imageUrl: input.imageUrl || image,
-    chargeTax: input.chargeTax ?? true,
-    trackQuantity: input.trackQuantity ?? true,
-    continueSelling: input.continueSelling ?? false,
-    hasSkuBarcode: input.hasSkuBarcode ?? Boolean(input.sku || input.barcode),
-    physicalProduct: input.physicalProduct ?? true,
-    weight: Number(input.weight || 0),
-    weightUnit: input.weightUnit || "kg",
-    originCountry: input.originCountry || "",
-    hsCode: input.hsCode || "",
-    onlineStore: input.onlineStore ?? true,
-    pointOfSale: input.pointOfSale ?? false,
-    marketIndia: input.marketIndia ?? true,
-    marketInternational: input.marketInternational ?? false,
-    seoTitle: input.seoTitle || name,
-    metaDescription: input.metaDescription || input.description || "",
-    optionName: input.optionName || "",
-    optionValues: input.optionValues || "",
-    variants: input.variants?.length ? input.variants : [],
-    notes: input.notes || "",
-    rating: Number(input.rating || 5),
-    reviews: Number(input.reviews || 0),
-    badge: input.badge,
-    colors: input.colors?.length ? input.colors : ["Default"],
-    sizes: input.sizes?.length ? input.sizes : ["Default"],
-    image,
-    gallery: gallery.length ? gallery : [image],
-    description: input.description || input.notes || "Product details will be updated soon."
-  };
-}
-
-function loadInitialProducts() {
-  const seedProducts = (catalogSeed as Partial<CatalogProduct>[]).map(normalizeProduct);
-  if (typeof window === "undefined") return [];
-
-  const saved = localStorage.getItem(catalogStorageKey);
-  if (saved) {
-    try {
-      return (JSON.parse(saved) as Partial<CatalogProduct>[]).map(normalizeProduct);
-    } catch {
-      localStorage.removeItem(catalogStorageKey);
-      return seedProducts;
-    }
+async function parseProductResponse(response: Response) {
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result?.error || "Catalog request failed.");
   }
-
-  const oldCrm = localStorage.getItem(oldCrmStorageKey);
-  if (!oldCrm) return seedProducts;
-
-  try {
-    const parsed = JSON.parse(oldCrm) as { products?: Partial<CatalogProduct>[] };
-    const migratedProducts = (parsed.products || []).map(normalizeProduct);
-    return migratedProducts.length ? migratedProducts : seedProducts;
-  } catch {
-    return seedProducts;
-  }
+  return result as CatalogProduct;
 }
 
 export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
-  const [isReady, setIsReady] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    setProducts(loadInitialProducts());
-    setIsReady(true);
+  const refreshProducts = useCallback(async () => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/products", { cache: "no-store" });
+      const result = (await response.json()) as CatalogProduct[] | { error?: string };
+      if (!response.ok || !Array.isArray(result)) {
+        throw new Error(!Array.isArray(result) ? result.error : "Could not load products.");
+      }
+      setProducts(result);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Could not load products.");
+      setProducts([]);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (!isReady) return;
-    localStorage.setItem(catalogStorageKey, JSON.stringify(products));
+    void refreshProducts();
+  }, [refreshProducts]);
+
+  const addProduct = useCallback(async (product: Partial<CatalogProduct>) => {
+    const response = await fetch("/api/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(product)
+    });
+    const savedProduct = await parseProductResponse(response);
+    setProducts((current) => [savedProduct, ...current.filter((item) => item.id !== savedProduct.id)]);
     window.dispatchEvent(new CustomEvent("podscentra-catalog-updated"));
-  }, [isReady, products]);
-
-  const addProduct = useCallback((product: Partial<CatalogProduct>) => {
-    const next = normalizeProduct(product);
-    setProducts((current) => [next, ...current]);
-    return next;
+    return savedProduct;
   }, []);
 
-  const updateProduct = useCallback((id: string, updates: Partial<CatalogProduct>) => {
-    setProducts((current) =>
-      current.map((product) => (product.id === id ? normalizeProduct({ ...product, ...updates, id: product.id }) : product))
-    );
+  const updateProduct = useCallback(async (id: string, updates: Partial<CatalogProduct>) => {
+    const response = await fetch(`/api/products/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates)
+    });
+    const savedProduct = await parseProductResponse(response);
+    setProducts((current) => current.map((product) => (product.id === id ? savedProduct : product)));
+    window.dispatchEvent(new CustomEvent("podscentra-catalog-updated"));
+    return savedProduct;
   }, []);
 
-  const deleteProduct = useCallback((id: string) => {
+  const deleteProduct = useCallback(async (id: string) => {
+    const response = await fetch(`/api/products/${id}`, { method: "DELETE" });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({ error: "Could not delete product." }));
+      throw new Error(result.error || "Could not delete product.");
+    }
     setProducts((current) => current.filter((product) => product.id !== id));
+    window.dispatchEvent(new CustomEvent("podscentra-catalog-updated"));
   }, []);
 
-  const setProductStatus = useCallback((id: string, status: ProductStatus) => {
-    setProducts((current) => current.map((product) => (product.id === id ? { ...product, status } : product)));
-  }, []);
+  const setProductStatus = useCallback(
+    async (id: string, status: ProductStatus) => {
+      await updateProduct(id, { status });
+    },
+    [updateProduct]
+  );
 
-  const adjustStock = useCallback((id: string, stock: number) => {
-    setProducts((current) => current.map((product) => (product.id === id ? { ...product, stock: Math.max(0, stock) } : product)));
-  }, []);
+  const adjustStock = useCallback(
+    async (id: string, stock: number) => {
+      await updateProduct(id, { stock: Math.max(0, stock) });
+    },
+    [updateProduct]
+  );
 
-  const importProducts = useCallback((nextProducts: Partial<CatalogProduct>[]) => {
-    setProducts(nextProducts.map(normalizeProduct));
-  }, []);
+  const importProducts = useCallback(
+    async (nextProducts: Partial<CatalogProduct>[]) => {
+      const savedProducts = await Promise.all(nextProducts.map((product) => addProduct(product)));
+      await refreshProducts();
+      return savedProducts;
+    },
+    [addProduct, refreshProducts]
+  );
 
   const value = useMemo<CatalogContextValue>(() => {
     const activeProducts = products.filter((product) => product.status === "Active");
@@ -211,6 +160,9 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       products,
       activeProducts,
       categories,
+      isLoading,
+      error,
+      refreshProducts,
       addProduct,
       updateProduct,
       deleteProduct,
@@ -218,7 +170,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       adjustStock,
       importProducts
     };
-  }, [addProduct, adjustStock, deleteProduct, importProducts, products, setProductStatus, updateProduct]);
+  }, [addProduct, adjustStock, deleteProduct, error, importProducts, isLoading, products, refreshProducts, setProductStatus, updateProduct]);
 
   return <CatalogContext.Provider value={value}>{children}</CatalogContext.Provider>;
 }

@@ -27,8 +27,6 @@ import { FormEvent, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const sessionKey = "podscentra-admin-session";
-const adminId = "podscentra_1";
-const adminPassword = "Secure@123";
 
 type NavItem = {
   label: string;
@@ -81,20 +79,27 @@ function NavLink({ item }: { item: NavItem }) {
 function LoginGate({ onLogin }: { onLogin: () => void }) {
   const [error, setError] = useState("");
 
-  function handleLogin(event: FormEvent<HTMLFormElement>) {
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const userId = String(form.get("userId") || "");
     const password = String(form.get("password") || "");
 
-    if (userId === adminId && password === adminPassword) {
+    const response = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, password })
+    });
+
+    if (response.ok) {
       localStorage.setItem(sessionKey, "active");
       setError("");
       onLogin();
       return;
     }
 
-    setError("Invalid admin ID or password.");
+    const result = await response.json().catch(() => ({ error: "Invalid admin ID or password." }));
+    setError(result.error || "Invalid admin ID or password.");
   }
 
   return (

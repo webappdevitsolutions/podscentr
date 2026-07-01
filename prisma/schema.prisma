@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProductStatus {
+  Active
+  Draft
+  Archived
+}
+
+enum Marketplace {
+  Amazon
+  Flipkart
+  Meesho
+  Myntra
+  Other
+  Manual
+}
+
+enum OrderStatus {
+  New
+  Confirmed
+  Processing
+  Paid
+  Packed
+  Shipped
+  Delivered
+  Cancelled
+}
+
+enum PaymentStatus {
+  Pending
+  COD_PENDING
+  Paid
+  Failed
+  Refunded
+}
+
+model Product {
+  id                  String           @id @default(cuid())
+  slug                String           @unique
+  name                String
+  category            String           @default("Uncategorized")
+  price               Float            @default(0)
+  oldPrice            Float?
+  compareAtPrice      Float?
+  cost                Float            @default(0)
+  stock               Int              @default(0)
+  reorderLevel        Int              @default(5)
+  sku                 String           @default("")
+  barcode             String           @default("")
+  status              ProductStatus    @default(Draft)
+  supplier            String           @default("")
+  vendor              String           @default("")
+  productType         String           @default("")
+  collections         String           @default("")
+  tags                String           @default("")
+  marketplace         Marketplace      @default(Manual)
+  sourceUrl           String           @default("")
+  externalId          String           @default("")
+  imageUrl            String           @default("")
+  notes               String           @default("")
+  rating              Float            @default(5)
+  reviews             Int              @default(0)
+  badge               String?
+  colors              String[]         @default([])
+  sizes               String[]         @default([])
+  image               String           @default("/product-placeholder.svg")
+  description         String           @default("Product details will be updated soon.")
+  chargeTax           Boolean          @default(true)
+  trackQuantity       Boolean          @default(true)
+  continueSelling     Boolean          @default(false)
+  hasSkuBarcode       Boolean          @default(false)
+  physicalProduct     Boolean          @default(true)
+  weight              Float            @default(0)
+  weightUnit          String           @default("kg")
+  originCountry       String           @default("")
+  hsCode              String           @default("")
+  onlineStore         Boolean          @default(true)
+  pointOfSale         Boolean          @default(false)
+  marketIndia         Boolean          @default(true)
+  marketInternational Boolean          @default(false)
+  seoTitle            String           @default("")
+  metaDescription     String           @default("")
+  optionName          String           @default("")
+  optionValues        String           @default("")
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  images              ProductImage[]
+  variants            ProductVariant[]
+  inventory           Inventory?
+  orderItems          OrderItem[]
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  url       String
+  position  Int     @default(0)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  name      String
+  price     Float   @default(0)
+  stock     Int     @default(0)
+  sku       String   @default("")
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model Inventory {
+  id           String   @id @default(cuid())
+  quantity     Int      @default(0)
+  reorderLevel Int      @default(5)
+  productId    String   @unique
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  updatedAt    DateTime @updatedAt
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  name       String
+  phone      String   @default("")
+  email      String   @default("")
+  city       String   @default("")
+  totalSpent Float    @default(0)
+  createdAt  DateTime @default(now())
+  orders     Order[]
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  customerId     String?
+  customer       Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName   String      @default("")
+  customerMobile String      @default("")
+  customerEmail  String      @default("")
+  addressLine1   String      @default("")
+  addressLine2   String      @default("")
+  city           String      @default("")
+  state          String      @default("")
+  pinCode        String      @default("")
+  country        String      @default("India")
+  fullAddress    String      @default("")
+  status         OrderStatus @default(New)
+  paymentMethod  String      @default("")
+  paymentGateway String      @default("")
+  paymentStatus  String      @default("Pending")
+  deliveryMethod String      @default("")
+  deliveryTime   String      @default("")
+  deliveryCharge Float       @default(0)
+  subtotal       Float       @default(0)
+  tax            Float       @default(0)
+  discount       Float       @default(0)
+  total          Float       @default(0)
+  finalAmount    Float       @default(0)
+  createdAt      DateTime    @default(now())
+  items          OrderItem[]
+  payment        Payment?
+
+  @@index([customerId])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  name      String
+  quantity  Int
+  price     Float
+  size      String?
+  color     String?
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  orderId          String        @unique
+  order            Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method           String
+  gateway          String        @default("")
+  amount           Float
+  status           PaymentStatus @default(Pending)
+  gatewayOrderId   String?
+  cfOrderId        String?
+  gatewayPaymentId String?
+  rawStatus        String        @default("")
+  createdAt        DateTime      @default(now())
+}

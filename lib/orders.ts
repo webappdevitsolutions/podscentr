@@ -8,7 +8,13 @@ export type SavedOrder = {
   date: string;
   customerName: string;
   customerMobile: string;
-  paymentMethod: PaymentMethod;
+  customerEmail: string;
+  fullAddress: string;
+  paymentMethod: string;
+  paymentGateway: string;
+  paymentStatus: string;
+  cashfreeOrderId: string;
+  cashfreePaymentId: string;
   deliveryMethod: "Standard Delivery" | "Express Delivery";
   deliveryTime: string;
   deliveryCharge: number;
@@ -17,18 +23,17 @@ export type SavedOrder = {
   discount: number;
   total: number;
   finalAmount: number;
+  orderStatus: string;
   items: Array<{
     id: string;
     productId: string;
     name: string;
     quantity: number;
     price: number;
-    size?: string;
-    color?: string;
+    size?: string | null;
+    color?: string | null;
   }>;
 };
-
-export const ordersStorageKey = "podscentra-orders";
 
 export const deliveryChargeTable: Record<DeliveryMethodId, Record<PaymentMethod, number>> = {
   standard: {
@@ -51,27 +56,6 @@ export const deliveryMethodDetails: Record<DeliveryMethodId, { title: SavedOrder
     time: "1-2 Business Days"
   }
 };
-
-export function makeOrderId() {
-  return `ORD-${Date.now().toString(36).toUpperCase()}`;
-}
-
-export function readOrders() {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const saved = localStorage.getItem(ordersStorageKey);
-    return saved ? (JSON.parse(saved) as SavedOrder[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveOrder(order: SavedOrder) {
-  const nextOrders = [order, ...readOrders()];
-  localStorage.setItem(ordersStorageKey, JSON.stringify(nextOrders));
-  window.dispatchEvent(new CustomEvent("podscentra-orders-updated"));
-}
 
 export function toOrderItems(items: CartItem[]): SavedOrder["items"] {
   return items.map((item) => ({

@@ -5,7 +5,7 @@ import { BarChart3, Boxes, ClipboardList, CreditCard, Download, FileText, Megaph
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { useCatalog } from "@/hooks/useCatalog";
-import { readOrders, type SavedOrder } from "@/lib/orders";
+import { type SavedOrder } from "@/lib/orders";
 import { formatCurrency } from "@/lib/utils";
 
 const sectionCopy: Record<string, { title: string; text: string; icon: typeof ClipboardList }> = {
@@ -40,22 +40,24 @@ function CatalogMigrationTools() {
   const [message, setMessage] = useState("");
 
   function exportProducts() {
-    const blob = new Blob([JSON.stringify(products, null, 2)], { type: "application/json" });
+    const legacyCatalog = localStorage.getItem("podscentra-catalog-products");
+    const exportProducts = legacyCatalog ? JSON.parse(legacyCatalog) : products;
+    const blob = new Blob([JSON.stringify(exportProducts, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = "catalog-products.json";
     link.click();
     URL.revokeObjectURL(url);
-    setMessage("Exported products JSON. Use it to update data/catalog-products.json before deploying.");
+    setMessage(legacyCatalog ? "Exported legacy browser products JSON." : "Exported database products JSON.");
   }
 
-  function importProductsJson(event: ChangeEvent<HTMLInputElement>) {
+  async function importProductsJson(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const parsed = JSON.parse(String(reader.result));
         if (!Array.isArray(parsed)) {
@@ -63,8 +65,8 @@ function CatalogMigrationTools() {
           return;
         }
 
-        importProducts(parsed);
-        setMessage(`Imported ${parsed.length} product${parsed.length === 1 ? "" : "s"} into this browser catalog.`);
+        await importProducts(parsed);
+        setMessage(`Imported ${parsed.length} product${parsed.length === 1 ? "" : "s"} into the database catalog.`);
       } catch {
         setMessage("Import failed. Check that the file is valid JSON.");
       }
@@ -77,7 +79,7 @@ function CatalogMigrationTools() {
     <section className="mt-6 rounded-xl border border-black/10 bg-white p-6 shadow-sm">
       <h2 className="text-lg font-bold">Catalog migration</h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
-        Vercel reads deployed products from <span className="font-semibold text-neutral-800">data/catalog-products.json</span>. Export local products, replace that seed file with the JSON, commit, and deploy to make them shared.
+        Products now live in the shared PostgreSQL catalog. Export old browser products if needed, then import the JSON here to save them into the database.
       </p>
       <div className="mt-5 flex flex-wrap gap-3">
         <button onClick={exportProducts} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-neutral-950 px-4 text-sm font-bold text-white hover:bg-neutral-800">
@@ -110,14 +112,19 @@ function OrdersTable({ orders }: { orders: SavedOrder[] }) {
         <h2 className="text-base font-bold">Recent orders</h2>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-[1280px] text-left text-sm">
           <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
               <th className="px-4 py-3">Order</th>
               <th className="px-4 py-3">Customer</th>
+              <th className="px-4 py-3">Delivery Address</th>
+              <th className="px-4 py-3">Items</th>
               <th className="px-4 py-3">Payment Method</th>
+              <th className="px-4 py-3">Payment Status</th>
+              <th className="px-4 py-3">Cashfree IDs</th>
               <th className="px-4 py-3">Delivery Method</th>
               <th className="px-4 py-3">Delivery Charge</th>
+              <th className="px-4 py-3">Order Status</th>
               <th className="px-4 py-3 text-right">Grand Total</th>
             </tr>
           </thead>
@@ -131,13 +138,30 @@ function OrdersTable({ orders }: { orders: SavedOrder[] }) {
                 <td className="px-4 py-3">
                   <p className="font-semibold">{order.customerName || "Customer"}</p>
                   <p className="text-xs text-neutral-500">{order.customerMobile || "No mobile"}</p>
+                  <p className="text-xs text-neutral-500">{order.customerEmail || "No email"}</p>
+                </td>
+                <td className="max-w-[240px] px-4 py-3 text-xs leading-5 text-neutral-600">{order.fullAddress || "No address"}</td>
+                <td className="px-4 py-3">
+                  <div className="grid gap-1">
+                    {order.items.map((item) => (
+                      <p key={item.id} className="text-xs text-neutral-600">
+                        {item.name} x {item.quantity}{item.size ? ` · ${item.size}` : ""}
+                      </p>
+                    ))}
+                  </div>
                 </td>
                 <td className="px-4 py-3 font-semibold">{order.paymentMethod}</td>
+                <td className="px-4 py-3 font-semibold">{order.paymentStatus}</td>
+                <td className="max-w-[180px] px-4 py-3 text-xs text-neutral-500">
+                  <p>{order.cashfreeOrderId || "-"}</p>
+                  <p>{order.cashfreePaymentId || "-"}</p>
+                </td>
                 <td className="px-4 py-3">
                   <p className="font-semibold">{order.deliveryMethod}</p>
                   <p className="text-xs text-neutral-500">{order.deliveryTime}</p>
                 </td>
                 <td className="px-4 py-3 font-semibold">{formatCurrency(order.deliveryCharge)}</td>
+                <td className="px-4 py-3 font-semibold">{order.orderStatus}</td>
                 <td className="px-4 py-3 text-right text-base font-black">{formatCurrency(order.finalAmount)}</td>
               </tr>
             ))}
@@ -158,17 +182,13 @@ export default function AdminSectionPage() {
   const inventoryValue = products.reduce((sum, product) => sum + product.stock * product.cost, 0);
 
   useEffect(() => {
-    function refreshOrders() {
-      setOrders(readOrders());
+    async function refreshOrders() {
+      const response = await fetch("/api/orders", { cache: "no-store" });
+      if (!response.ok) return;
+      setOrders((await response.json()) as SavedOrder[]);
     }
 
-    refreshOrders();
-    window.addEventListener("podscentra-orders-updated", refreshOrders);
-    window.addEventListener("storage", refreshOrders);
-    return () => {
-      window.removeEventListener("podscentra-orders-updated", refreshOrders);
-      window.removeEventListener("storage", refreshOrders);
-    };
+    void refreshOrders();
   }, []);
 
   return (

@@ -214,11 +214,12 @@ function CheckboxField({ label, checked, onChange, helper }: { label: string; ch
 
 export function ProductEditor({ mode, productId }: { mode: EditorMode; productId?: string }) {
   const router = useRouter();
-  const { products, addProduct, updateProduct } = useCatalog();
+  const { products, addProduct, updateProduct, isLoading } = useCatalog();
   const existingProduct = useMemo(() => products.find((product) => product.id === productId), [productId, products]);
   const [state, setState] = useState<EditorState>(emptyState);
   const [message, setMessage] = useState("");
   const [isImporting, setIsImporting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (mode === "edit" && existingProduct) {
@@ -347,7 +348,7 @@ export function ProductEditor({ mode, productId }: { mode: EditorMode; productId
     }
   }
 
-  function saveProduct() {
+  async function saveProduct() {
     const title = state.title.trim();
     if (!title) {
       setMessage("Add a product title before saving.");
@@ -400,13 +401,32 @@ export function ProductEditor({ mode, productId }: { mode: EditorMode; productId
       notes: state.description
     };
 
-    if (mode === "edit" && existingProduct) {
-      updateProduct(existingProduct.id, payload);
-    } else {
-      addProduct(payload);
-    }
+    setIsSaving(true);
+    setMessage("");
 
-    router.push("/admin/products");
+    try {
+      if (mode === "edit" && existingProduct) {
+        await updateProduct(existingProduct.id, payload);
+      } else {
+        await addProduct(payload);
+      }
+
+      router.push("/admin/products");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not save product.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (mode === "edit" && productId && isLoading) {
+    return (
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        <div className="rounded-xl border border-black/10 bg-white p-8 text-center text-sm font-semibold text-neutral-500 shadow-sm">
+          Loading product...
+        </div>
+      </div>
+    );
   }
 
   if (mode === "edit" && productId && !existingProduct) {
@@ -433,8 +453,8 @@ export function ProductEditor({ mode, productId }: { mode: EditorMode; productId
             </Link>
             <h1 className="text-xl font-bold tracking-tight">{mode === "new" ? "Add product" : "Edit product"}</h1>
           </div>
-          <button onClick={saveProduct} className="min-h-9 rounded-lg bg-neutral-950 px-4 text-sm font-bold text-white transition hover:bg-neutral-800">
-            Save
+          <button onClick={saveProduct} disabled={isSaving} className="min-h-9 rounded-lg bg-neutral-950 px-4 text-sm font-bold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60">
+            {isSaving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
@@ -677,8 +697,8 @@ export function ProductEditor({ mode, productId }: { mode: EditorMode; productId
             </div>
           </Card>
 
-          <button onClick={saveProduct} className="sticky bottom-4 min-h-11 w-full rounded-lg bg-neutral-950 px-4 text-sm font-bold text-white shadow-lg transition hover:bg-neutral-800">
-            Save product
+          <button onClick={saveProduct} disabled={isSaving} className="sticky bottom-4 min-h-11 w-full rounded-lg bg-neutral-950 px-4 text-sm font-bold text-white shadow-lg transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60">
+            {isSaving ? "Saving product..." : "Save product"}
           </button>
         </aside>
       </div>

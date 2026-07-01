@@ -32,12 +32,14 @@ function cartLineId(product: Product, size?: string, color?: string) {
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const { products } = useCatalog();
+  const { products, isLoading: isCatalogLoading } = useCatalog();
   const [items, setItems] = useState<CartItem[]>([]);
   const [toast, setToast] = useState<Toast | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    if (isCatalogLoading) return;
+
     const productIds = new Set(products.map((product) => product.id));
     const savedCart = localStorage.getItem("podscentra-cart");
     if (savedCart) {
@@ -53,7 +55,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
     localStorage.removeItem("podscentra-wishlist");
     setIsReady(true);
-  }, [products]);
+  }, [isCatalogLoading, products]);
 
   useEffect(() => {
     if (!isReady) return;

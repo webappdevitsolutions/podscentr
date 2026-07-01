@@ -5,7 +5,7 @@ import { AlertTriangle, Boxes, ClipboardList, CreditCard, PackagePlus, ShoppingB
 import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { useCatalog } from "@/hooks/useCatalog";
-import { readOrders, type SavedOrder } from "@/lib/orders";
+import { type SavedOrder } from "@/lib/orders";
 import { formatCurrency } from "@/lib/utils";
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint: string }) {
@@ -38,17 +38,13 @@ export default function AdminDashboardPage() {
   const paymentTotal = orders.reduce((sum, order) => sum + order.finalAmount, 0);
 
   useEffect(() => {
-    function refreshOrders() {
-      setOrders(readOrders());
+    async function refreshOrders() {
+      const response = await fetch("/api/orders", { cache: "no-store" });
+      if (!response.ok) return;
+      setOrders((await response.json()) as SavedOrder[]);
     }
 
-    refreshOrders();
-    window.addEventListener("podscentra-orders-updated", refreshOrders);
-    window.addEventListener("storage", refreshOrders);
-    return () => {
-      window.removeEventListener("podscentra-orders-updated", refreshOrders);
-      window.removeEventListener("storage", refreshOrders);
-    };
+    void refreshOrders();
   }, []);
 
   return (
@@ -98,8 +94,25 @@ export default function AdminDashboardPage() {
           </section>
 
           <div className="space-y-4">
-            <EmptyPanel Icon={ClipboardList} title="No orders yet" text="Orders will appear here after customers checkout." />
-            <EmptyPanel Icon={Users} title="No customers yet" text="Customer profiles will appear as orders come in." />
+            {orders.length ? (
+              <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-bold">Recent orders</h2>
+                  <Link href="/admin/orders" className="text-sm font-bold text-blue-700">View all</Link>
+                </div>
+                <div className="mt-3 divide-y divide-black/10">
+                  {orders.slice(0, 4).map((order) => (
+                    <div key={order.id} className="py-3">
+                      <p className="font-semibold">{order.customerName}</p>
+                      <p className="text-xs text-neutral-500">{order.paymentMethod} · {order.paymentStatus} · {formatCurrency(order.finalAmount)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <EmptyPanel Icon={ClipboardList} title="No orders yet" text="Orders will appear here after customers checkout." />
+            )}
+            <EmptyPanel Icon={Users} title={orders.length ? "Customers active" : "No customers yet"} text={orders.length ? "Customer profiles are being created from checkout orders." : "Customer profiles will appear as orders come in."} />
             <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-1 text-amber-600" size={20} />
