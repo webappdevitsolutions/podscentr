@@ -13,8 +13,8 @@ if (!shouldSync) {
 }
 
 if (databaseUrl.includes("railway.internal")) {
-  console.error("DATABASE_URL uses Railway's private internal host. Vercel needs Railway's public TCP proxy/Postgres URL instead.");
-  process.exit(1);
+  console.warn("DATABASE_URL uses Railway's private internal host. Skipping DB sync; set Railway's public TCP proxy/Postgres URL in Vercel for database-backed APIs.");
+  process.exit(0);
 }
 
 function runPrisma(args) {

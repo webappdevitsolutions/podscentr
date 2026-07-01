@@ -5,12 +5,17 @@ import { productCreateInput, productInclude, productUpdateInput, serializeProduc
 export const runtime = "nodejs";
 
 export async function GET() {
-  const products = await prisma.product.findMany({
-    include: productInclude,
-    orderBy: { createdAt: "desc" }
-  });
+  try {
+    const products = await prisma.product.findMany({
+      include: productInclude,
+      orderBy: { createdAt: "desc" }
+    });
 
-  return NextResponse.json(products.map(serializeProduct));
+    return NextResponse.json(products.map(serializeProduct));
+  } catch (error) {
+    console.error("Product list failed", error);
+    return NextResponse.json({ error: "Could not load products." }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
