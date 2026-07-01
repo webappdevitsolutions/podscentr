@@ -96,7 +96,7 @@ function DescriptionBlock({ description }: { description: string }) {
         className="mt-4 overflow-hidden transition-[max-height] duration-500 ease-in-out"
         style={{ maxHeight: expanded || !hasLongDescription ? `${height}px` : "8.6rem" }}
       >
-        <div ref={contentRef} className="max-w-[680px] space-y-4 text-[15px] font-normal leading-[1.75] text-neutral-650 dark:text-neutral-300 sm:text-base">
+        <div ref={contentRef} className="max-w-[680px] space-y-4 text-[15px] font-normal leading-[1.75] text-neutral-650 dark:text-neutral-300 sm:text-[16px]">
           {paragraphs.length ? (
             paragraphs.map((paragraph, index) => {
               const isBullet = /^[-*]/.test(paragraph);
@@ -104,7 +104,7 @@ function DescriptionBlock({ description }: { description: string }) {
 
               if (isBullet) {
                 return (
-                  <ul key={paragraph} className="list-disc space-y-2 pl-5 text-[15px] font-normal leading-[1.75] sm:text-base">
+                  <ul key={paragraph} className="list-disc space-y-2 pl-5 text-[15px] font-normal leading-[1.75] sm:text-[16px]">
                     {paragraph
                       .split(/\n/)
                       .map((item) => item.replace(/^[-*]\s*/, "").trim())
@@ -117,10 +117,10 @@ function DescriptionBlock({ description }: { description: string }) {
               }
 
               if (isHeading) {
-                return <p key={paragraph} className="text-[15px] font-normal leading-[1.75] text-neutral-700 dark:text-neutral-300 sm:text-base">{paragraph}</p>;
+                return <p key={paragraph} className="text-[15px] font-normal leading-[1.75] text-neutral-700 dark:text-neutral-300 sm:text-[16px]">{paragraph}</p>;
               }
 
-              return <p key={`${paragraph}-${index}`} className="text-[15px] font-normal leading-[1.75] sm:text-base">{paragraph}</p>;
+              return <p key={`${paragraph}-${index}`} className="text-[15px] font-normal leading-[1.75] sm:text-[16px]">{paragraph}</p>;
             })
           ) : (
             <p>Product details will be updated soon.</p>
