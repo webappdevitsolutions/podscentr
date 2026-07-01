@@ -61,7 +61,7 @@ function validateAddress(address: ShippingAddress) {
   if (!address.country) errors.country = "Country is required";
   if (!address.fullName.trim()) errors.fullName = "Full name is required";
   if (!address.phone.trim()) errors.phone = "Phone number is required";
-  else if (!/^\d{10}$/.test(address.phone)) errors.phone = "Enter a valid 10-digit phone number";
+  else if (!/^[6-9]\d{9}$/.test(address.phone)) errors.phone = "Please enter a valid 10-digit phone number.";
   if (!address.email.trim()) errors.email = "Email is required";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.email)) errors.email = "Enter a valid email address";
   if (!/^\d{6}$/.test(address.pinCode)) errors.pinCode = "PIN code must be 6 digits";
@@ -162,7 +162,8 @@ export default function CheckoutPage() {
     const result = await response.json();
 
     if (!response.ok || !result.payment_session_id || !result.order_id) {
-      throw new Error(result.error || "Could not start Cashfree payment.");
+      const detail = result.details ? ` ${result.details}` : "";
+      throw new Error(`${result.error || "Could not start Cashfree payment."}${detail}`);
     }
 
     console.info("Cashfree order created", {

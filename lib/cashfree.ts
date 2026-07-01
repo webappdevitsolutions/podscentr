@@ -1,10 +1,17 @@
 import { assertServerEnv } from "@/lib/env";
 
 const cashfreeApiVersion = "2025-01-01";
+const safeIdPattern = /^[A-Za-z0-9_-]+$/;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const indianMobilePattern = /^[6-9]\d{9}$/;
+
+export function cashfreeEnvironment() {
+  const env = (process.env.CASHFREE_ENV || "SANDBOX").trim().toUpperCase();
+  return env === "PRODUCTION" || env === "PROD" || env === "LIVE" ? "PRODUCTION" : "SANDBOX";
+}
 
 function cashfreeBaseUrl() {
-  const env = (process.env.CASHFREE_ENV || "").toLowerCase();
-  return env === "production" || env === "prod" || env === "live"
+  return cashfreeEnvironment() === "PRODUCTION"
     ? "https://api.cashfree.com/pg"
     : "https://sandbox.cashfree.com/pg";
 }
@@ -30,6 +37,52 @@ export function toCashfreeCustomerId(value?: string | null) {
     .slice(0, 50);
 
   return safeId || `customer_${Date.now()}`;
+}
+
+export function toCashfreeOrderId(value: string) {
+  const safeId = value
+    .replace(/[^A-Za-z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 50);
+
+  return safeId || `order_${Date.now()}`;
+}
+
+export class CashfreeOrderError extends Error {
+  details: string;
+  status?: number;
+  body?: unknown;
+
+  constructor(message: string, options?: { status?: number; body?: unknown }) {
+    super(message);
+    this.name = "CashfreeOrderError";
+    this.details = message;
+    this.status = options?.status;
+    this.body = options?.body;
+  }
+}
+
+function validateCashfreePayload(payload: {
+  order_id: string;
+  order_amount: number;
+  order_currency: string;
+  customer_details: {
+    customer_id: string;
+    customer_email: string;
+    customer_phone: string;
+  };
+}) {
+  const errors: string[] = [];
+
+  if (!safeIdPattern.test(payload.order_id)) errors.push("Cashfree order_id must contain only letters, numbers, underscores, or hyphens.");
+  if (!safeIdPattern.test(payload.customer_details.customer_id)) errors.push("Cashfree customer_id must contain only letters, numbers, underscores, or hyphens.");
+  if (!indianMobilePattern.test(payload.customer_details.customer_phone)) errors.push("Please enter a valid 10-digit phone number.");
+  if (!emailPattern.test(payload.customer_details.customer_email)) errors.push("Email is invalid.");
+  if (!(payload.order_amount > 0)) errors.push("Order amount must be greater than 0.");
+  if (payload.order_currency !== "INR") errors.push("Order currency must be INR.");
+
+  return errors;
 }
 
 export type CashfreeCreateOrderResponse = {
@@ -66,34 +119,61 @@ export async function createCashfreeOrder(input: {
   returnUrl: string;
   note?: string;
 }) {
+  const cashfreeOrderId = toCashfreeOrderId(input.orderId);
+  const cashfreeCustomerId = toCashfreeCustomerId(input.customer.id);
+  const requestBody = {
+    order_id: cashfreeOrderId,
+    order_amount: Number(input.amount.toFixed(2)),
+    order_currency: "INR",
+    customer_details: {
+      customer_id: cashfreeCustomerId,
+      customer_name: input.customer.name,
+      customer_email: input.customer.email,
+      customer_phone: input.customer.phone
+    },
+    order_meta: {
+      return_url: input.returnUrl
+    },
+    order_note: input.note || "Podscentra order"
+  };
+  const validationErrors = validateCashfreePayload(requestBody);
+
+  if (validationErrors.length) {
+    throw new CashfreeOrderError(validationErrors.join(" "));
+  }
+
+  console.info("Cashfree order request", {
+    emailPresent: Boolean(input.customer.email),
+    phoneLength: input.customer.phone.length,
+    orderAmount: requestBody.order_amount,
+    orderId: requestBody.order_id,
+    customerId: requestBody.customer_details.customer_id,
+    cashfreeEnv: cashfreeEnvironment()
+  });
+
   const response = await fetch(`${cashfreeBaseUrl()}/orders`, {
     method: "POST",
     headers: cashfreeHeaders(),
-    body: JSON.stringify({
-      order_id: input.orderId,
-      order_amount: Number(input.amount.toFixed(2)),
-      order_currency: "INR",
-      customer_details: {
-        customer_id: toCashfreeCustomerId(input.customer.id),
-        customer_name: input.customer.name,
-        customer_email: input.customer.email,
-        customer_phone: input.customer.phone
-      },
-      order_meta: {
-        return_url: input.returnUrl
-      },
-      order_note: input.note || "Podscentra order"
-    })
+    body: JSON.stringify(requestBody)
   });
 
-  const result = (await response.json()) as CashfreeCreateOrderResponse & { message?: string; error?: string };
+  const responseText = await response.text();
+  let result: CashfreeCreateOrderResponse & { message?: string; error?: string };
+  try {
+    result = JSON.parse(responseText) as CashfreeCreateOrderResponse & { message?: string; error?: string };
+  } catch {
+    result = { order_id: cashfreeOrderId, payment_session_id: "", message: responseText };
+  }
+
+  console.info("Cashfree order response", {
+    status: response.status,
+    ok: response.ok,
+    body: result
+  });
+
   if (!response.ok) {
-    console.error("Cashfree order API failed", {
-      status: response.status,
-      statusText: response.statusText,
-      result
-    });
-    throw new Error(result.message || result.error || "Cashfree order creation failed.");
+    const message = result.message || result.error || "Cashfree order creation failed.";
+    throw new CashfreeOrderError(message, { status: response.status, body: result });
   }
 
   return result;

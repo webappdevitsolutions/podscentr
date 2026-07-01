@@ -72,6 +72,13 @@ export type SerializedOrder = {
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const indianMobilePattern = /^[6-9]\d{9}$/;
+
+export function normalizeIndianPhone(value?: string | null) {
+  const compact = (value || "").trim().replace(/[\s-]/g, "");
+  const withoutCountryCode = compact.replace(/^(\+91|91)/, "");
+  return withoutCountryCode.replace(/\D/g, "");
+}
 
 export function makeDatabaseOrderId() {
   return `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -83,7 +90,10 @@ export function validateCheckoutPayload(payload: CheckoutPayload) {
   const address = payload.shippingAddress || {};
 
   if (!customer.name?.trim()) errors.push("Name is required.");
+  const normalizedPhone = normalizeIndianPhone(customer.phone);
+
   if (!customer.phone?.trim()) errors.push("Phone is required.");
+  else if (!indianMobilePattern.test(normalizedPhone)) errors.push("Please enter a valid 10-digit phone number.");
   if (!customer.email?.trim()) errors.push("Email is required.");
   else if (!emailPattern.test(customer.email)) errors.push("Email is invalid.");
   if (!address.addressLine1?.trim()) errors.push("Address line 1 is required.");
@@ -156,6 +166,7 @@ export async function createCheckoutOrder(
   const { items, subtotal, deliveryCharge, tax, discount, total, selectedDelivery } = await buildOrderAmounts(payload);
   const address = payload.shippingAddress;
   const customer = payload.customer;
+  const customerPhone = normalizeIndianPhone(customer.phone);
   const country = address.country || "India";
   const fullAddress = [address.addressLine1, address.addressLine2, address.city, address.state, address.pinCode, country]
     .filter(Boolean)
@@ -169,7 +180,7 @@ export async function createCheckoutOrder(
         where: { id: existingCustomer.id },
         data: {
           name: customer.name,
-          phone: customer.phone,
+          phone: customerPhone,
           city: address.city
         }
       })
@@ -177,7 +188,7 @@ export async function createCheckoutOrder(
       data: {
         name: customer.name,
         email: customer.email,
-        phone: customer.phone,
+        phone: customerPhone,
         city: address.city
       }
     });
@@ -187,7 +198,7 @@ export async function createCheckoutOrder(
       id: options.id || makeDatabaseOrderId(),
       customerId: savedCustomer.id,
       customerName: customer.name,
-      customerMobile: customer.phone,
+      customerMobile: customerPhone,
       customerEmail: customer.email,
       addressLine1: address.addressLine1,
       addressLine2: address.addressLine2 || "",
