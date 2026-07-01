@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getDatabaseUrlDiagnostics, prisma } from "@/lib/prisma";
 import { productCreateInput, productInclude, productUpdateInput, serializeProduct, type CatalogPayload } from "@/lib/catalog-db";
 
 export const runtime = "nodejs";
@@ -14,7 +14,13 @@ export async function GET() {
     return NextResponse.json(products.map(serializeProduct));
   } catch (error) {
     console.error("Product list failed", error);
-    return NextResponse.json({ error: "Could not load products." }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "Could not load products.",
+        details: getDatabaseUrlDiagnostics().message
+      },
+      { status: 500 }
+    );
   }
 }
 
