@@ -1,35 +1,156 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { CheckCircle2 } from "lucide-react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { LinkButton } from "@/components/Button";
+import { type SerializedOrder } from "@/lib/checkout-db";
+import { formatCurrency } from "@/lib/utils";
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1 border-b border-black/10 py-3 last:border-b-0 dark:border-white/10 sm:flex-row sm:justify-between sm:gap-6">
+      <span className="text-sm text-neutral-500 dark:text-neutral-400">{label}</span>
+      <span className="text-sm font-bold text-ink dark:text-white sm:text-right">{value}</span>
+    </div>
+  );
+}
+
+function OrderSuccessContent() {
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get("orderId") || searchParams.get("order_id") || "";
+  const [order, setOrder] = useState<SerializedOrder | null>(null);
+  const [isLoading, setIsLoading] = useState(Boolean(orderId));
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!orderId) {
+      setIsLoading(false);
+      setError("Order ID is missing.");
+      return;
+    }
+
+    let isCurrent = true;
+
+    async function loadOrder() {
+      try {
+        const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, { cache: "no-store" });
+        const result = await response.json();
+
+        if (!response.ok || !result.order) {
+          throw new Error(result.error || "Could not load order.");
+        }
+
+        if (isCurrent) setOrder(result.order as SerializedOrder);
+      } catch (loadError) {
+        if (isCurrent) {
+          console.error("Order confirmation lookup failed", loadError);
+          setError("We could not load your order details. Please contact support with your order ID.");
+        }
+      } finally {
+        if (isCurrent) setIsLoading(false);
+      }
+    }
+
+    loadOrder();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [orderId]);
+
+  if (isLoading) {
+    return (
+      <section className="mx-auto flex min-h-[70vh] max-w-3xl flex-col items-center justify-center px-4 text-center">
+        <Loader2 className="h-10 w-10 animate-spin text-accent" />
+        <h1 className="mt-6 text-3xl font-black">Loading your order</h1>
+      </section>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <section className="mx-auto flex min-h-[70vh] max-w-3xl flex-col items-center justify-center px-4 text-center">
+        <h1 className="text-4xl font-black">Order confirmation</h1>
+        <p className="mt-4 max-w-xl text-neutral-500 dark:text-neutral-400">{error || "Order details are unavailable."}</p>
+        {orderId ? <p className="mt-3 text-sm font-bold">Order ID: {orderId}</p> : null}
+        <LinkButton href="/shop" className="mt-8">Continue shopping</LinkButton>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="rounded-[2rem] bg-white p-6 shadow-luxury dark:bg-white/5 sm:p-8">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-600">
+              <CheckCircle2 size={36} />
+            </div>
+            <h1 className="mt-5 text-4xl font-black tracking-tight sm:text-5xl">Thank you for your order</h1>
+            <p className="mt-3 text-neutral-500 dark:text-neutral-400">Your order has been received and is being prepared.</p>
+          </div>
+          <div className="rounded-2xl bg-neutral-50 px-5 py-4 text-left dark:bg-white/5 sm:text-right">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-accent">Order ID</p>
+            <p className="mt-1 break-all text-lg font-black">{order.id}</p>
+          </div>
+        </div>
+
+        <div className="mt-8 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-3xl border border-black/10 p-5 dark:border-white/10">
+            <h2 className="text-xl font-black">Customer details</h2>
+            <div className="mt-3">
+              <DetailRow label="Customer name" value={order.customerName} />
+              <DetailRow label="Phone" value={order.customerMobile} />
+              <DetailRow label="Email" value={order.customerEmail} />
+              <DetailRow label="Shipping address" value={order.fullAddress} />
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-black/10 p-5 dark:border-white/10">
+            <h2 className="text-xl font-black">Payment and delivery</h2>
+            <div className="mt-3">
+              <DetailRow label="Payment method" value={order.paymentMethod === "COD" ? "Cash on Delivery" : "Online Payment"} />
+              <DetailRow label="Payment status" value={order.paymentStatus} />
+              <DetailRow label="Delivery method" value={order.deliveryMethod} />
+              <DetailRow label="Delivery charge" value={formatCurrency(order.deliveryCharge)} />
+              <DetailRow label="Total" value={formatCurrency(order.finalAmount)} />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-3xl border border-black/10 p-5 dark:border-white/10">
+          <h2 className="text-xl font-black">Items</h2>
+          <div className="mt-3 grid gap-3">
+            {order.items.map((item) => (
+              <div key={item.id} className="flex flex-col gap-1 rounded-2xl bg-neutral-50 p-4 dark:bg-white/5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-black">{item.name}</p>
+                  <p className="text-sm text-neutral-500">
+                    Qty {item.quantity}
+                    {item.size ? ` / ${item.size}` : ""}
+                    {item.color ? ` / ${item.color}` : ""}
+                  </p>
+                </div>
+                <p className="font-black">{formatCurrency(item.price * item.quantity)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <LinkButton href="/shop">Continue shopping</LinkButton>
+          <LinkButton href="/" variant="ghost">Back home</LinkButton>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function OrderSuccessPage() {
   return (
-    <section className="mx-auto flex min-h-[70vh] max-w-4xl flex-col items-center justify-center px-4 text-center">
-      <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex h-24 w-24 items-center justify-center rounded-full bg-green-100 text-green-600">
-        <CheckCircle2 size={52} />
-      </motion.div>
-      <h1 className="mt-8 text-5xl font-black sm:text-7xl">Order confirmed</h1>
-      <p className="mt-4 max-w-xl text-neutral-500 dark:text-neutral-400">Your Podscentra order is being prepared. Tracking updates will appear as each delivery stage completes.</p>
-      <div className="mt-8 w-full rounded-3xl bg-white p-6 text-left dark:bg-white/5">
-        {["Order placed", "Packed", "In transit", "Delivered"].map((stage, index) => (
-          <div key={stage} className="flex gap-4 pb-5 last:pb-0">
-            <span className={`mt-1 h-4 w-4 rounded-full ${index === 0 ? "bg-accent" : "bg-neutral-300"}`} />
-            <div>
-              <p className="font-black">{stage}</p>
-              <p className="text-sm text-neutral-500">Estimated update {index + 1} business day{index ? "s" : ""}.</p>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-5 w-full rounded-3xl border border-dashed border-accent/40 bg-violet-50 p-6 text-left dark:bg-white/5">
-        <h2 className="text-2xl font-black">Order confirmation email</h2>
-        <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">
-          A confirmation email has been prepared for your inbox with invoice, delivery address, tracking link, and support contact details.
-        </p>
-      </div>
-      <LinkButton href="/shop" className="mt-8">Continue shopping</LinkButton>
-    </section>
+    <Suspense fallback={<section className="mx-auto flex min-h-[70vh] max-w-3xl items-center justify-center px-4 text-center">Loading order...</section>}>
+      <OrderSuccessContent />
+    </Suspense>
   );
 }
