@@ -1,0 +1,86 @@
+import { type CartItem } from "@/hooks/useCart";
+
+export type PaymentMethod = "Online Payment" | "Cash on Delivery";
+export type DeliveryMethodId = "standard" | "express";
+
+export type SavedOrder = {
+  id: string;
+  date: string;
+  customerName: string;
+  customerMobile: string;
+  paymentMethod: PaymentMethod;
+  deliveryMethod: "Standard Delivery" | "Express Delivery";
+  deliveryTime: string;
+  deliveryCharge: number;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  finalAmount: number;
+  items: Array<{
+    id: string;
+    productId: string;
+    name: string;
+    quantity: number;
+    price: number;
+    size?: string;
+    color?: string;
+  }>;
+};
+
+export const ordersStorageKey = "podscentra-orders";
+
+export const deliveryChargeTable: Record<DeliveryMethodId, Record<PaymentMethod, number>> = {
+  standard: {
+    "Online Payment": 49,
+    "Cash on Delivery": 100
+  },
+  express: {
+    "Online Payment": 99,
+    "Cash on Delivery": 150
+  }
+};
+
+export const deliveryMethodDetails: Record<DeliveryMethodId, { title: SavedOrder["deliveryMethod"]; time: string }> = {
+  standard: {
+    title: "Standard Delivery",
+    time: "3-5 Business Days"
+  },
+  express: {
+    title: "Express Delivery",
+    time: "1-2 Business Days"
+  }
+};
+
+export function makeOrderId() {
+  return `ORD-${Date.now().toString(36).toUpperCase()}`;
+}
+
+export function readOrders() {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const saved = localStorage.getItem(ordersStorageKey);
+    return saved ? (JSON.parse(saved) as SavedOrder[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveOrder(order: SavedOrder) {
+  const nextOrders = [order, ...readOrders()];
+  localStorage.setItem(ordersStorageKey, JSON.stringify(nextOrders));
+  window.dispatchEvent(new CustomEvent("podscentra-orders-updated"));
+}
+
+export function toOrderItems(items: CartItem[]): SavedOrder["items"] {
+  return items.map((item) => ({
+    id: item.id,
+    productId: item.product.id,
+    name: item.product.name,
+    quantity: item.quantity,
+    price: item.product.price,
+    size: item.size,
+    color: item.color
+  }));
+}
