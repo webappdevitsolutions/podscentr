@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { OrderStatus } from "@/lib/generated/prisma/client";
-import { createCashfreeOrder } from "@/lib/cashfree";
+import { createCashfreeOrder, toCashfreeCustomerId } from "@/lib/cashfree";
 import { createCheckoutOrder, makeDatabaseOrderId, orderInclude, serializeOrder, validateCheckoutPayload, type CheckoutPayload } from "@/lib/checkout-db";
 import { prisma } from "@/lib/prisma";
 
@@ -28,11 +28,12 @@ export async function POST(request: Request) {
       orderStatus: OrderStatus.New
     });
     const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://podscentra.vercel.app";
+    const safeCustomerId = toCashfreeCustomerId(`customer_${order.customer?.id || order.customerId || order.id || payload.customer.phone}`);
     const cashfreeOrder = await createCashfreeOrder({
       orderId,
       amount: order.finalAmount,
       customer: {
-        id: payload.customer.email || payload.customer.phone,
+        id: safeCustomerId,
         name: payload.customer.name,
         email: payload.customer.email,
         phone: payload.customer.phone
@@ -62,6 +63,9 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Cashfree order creation failed", error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Could not start Cashfree payment." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Payment could not be started. Please check your details and try again." },
+      { status: 400 }
+    );
   }
 }

@@ -21,6 +21,17 @@ function cashfreeHeaders() {
   };
 }
 
+export function toCashfreeCustomerId(value?: string | null) {
+  const safeId = (value || `customer_${Date.now()}`)
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 50);
+
+  return safeId || `customer_${Date.now()}`;
+}
+
 export type CashfreeCreateOrderResponse = {
   cf_order_id?: string;
   order_id: string;
@@ -63,7 +74,7 @@ export async function createCashfreeOrder(input: {
       order_amount: Number(input.amount.toFixed(2)),
       order_currency: "INR",
       customer_details: {
-        customer_id: input.customer.id,
+        customer_id: toCashfreeCustomerId(input.customer.id),
         customer_name: input.customer.name,
         customer_email: input.customer.email,
         customer_phone: input.customer.phone
@@ -77,6 +88,11 @@ export async function createCashfreeOrder(input: {
 
   const result = (await response.json()) as CashfreeCreateOrderResponse & { message?: string; error?: string };
   if (!response.ok) {
+    console.error("Cashfree order API failed", {
+      status: response.status,
+      statusText: response.statusText,
+      result
+    });
     throw new Error(result.message || result.error || "Cashfree order creation failed.");
   }
 
