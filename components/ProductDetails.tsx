@@ -104,7 +104,7 @@ function DescriptionBlock({ description }: { description: string }) {
 
               if (isBullet) {
                 return (
-                  <ul key={paragraph} className="list-disc space-y-2 pl-5">
+                  <ul key={paragraph} className="list-disc space-y-2 pl-5 text-[15px] font-normal leading-[1.75] sm:text-base">
                     {paragraph
                       .split(/\n/)
                       .map((item) => item.replace(/^[-*]\s*/, "").trim())
@@ -117,10 +117,10 @@ function DescriptionBlock({ description }: { description: string }) {
               }
 
               if (isHeading) {
-                return <p key={paragraph} className="font-normal text-neutral-700 dark:text-neutral-300">{paragraph}</p>;
+                return <p key={paragraph} className="text-[15px] font-normal leading-[1.75] text-neutral-700 dark:text-neutral-300 sm:text-base">{paragraph}</p>;
               }
 
-              return <p key={`${paragraph}-${index}`}>{paragraph}</p>;
+              return <p key={`${paragraph}-${index}`} className="text-[15px] font-normal leading-[1.75] sm:text-base">{paragraph}</p>;
             })
           ) : (
             <p>Product details will be updated soon.</p>
