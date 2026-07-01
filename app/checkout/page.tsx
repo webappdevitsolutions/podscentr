@@ -415,7 +415,7 @@ export default function CheckoutPage() {
             </div>
             {paymentMethod === "Online Payment" ? (
               <div className="mt-5 rounded-2xl border border-black/10 p-4 text-sm leading-6 text-neutral-500 transition dark:border-white/10 dark:text-neutral-400">
-                You&apos;ll pay securely through Cashfree. Podscentra never sees or stores your card, UPI, or netbanking details.
+                Payments are processed securely through Cashfree. Podscentra does not store card, UPI, or netbanking details.
               </div>
             ) : null}
             {paymentMethod === "Cash on Delivery" ? (
@@ -426,6 +426,9 @@ export default function CheckoutPage() {
             {paymentError ? (
               <p className="mt-4 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-600 dark:bg-red-500/10">{paymentError}</p>
             ) : null}
+            <p className="mt-4 text-sm font-bold text-neutral-600 dark:text-neutral-300">
+              Need help? Contact us at <a className="text-accent" href="tel:+9101204217372">+91 0120 421 7372</a>.
+            </p>
           </div>
         </div>
       </div>
@@ -468,6 +471,10 @@ export default function CheckoutPage() {
           {isProcessing ? "Processing..." : paymentMethod === "Cash on Delivery" ? "Place order" : isCashfreeReady ? `Pay ${formatCurrency(total)}` : "Loading payment..."}
         </button>
         <LinkButton href="/cart" variant="ghost" className="mt-3 w-full">Back to cart</LinkButton>
+        <div className="mt-5 rounded-2xl bg-neutral-50 p-4 text-xs leading-6 text-neutral-500 dark:bg-white/5 dark:text-neutral-400">
+          <p className="font-bold text-ink dark:text-white">Need help? Contact us at +91 0120 421 7372.</p>
+          <p className="mt-1">Payments are processed securely through Cashfree. Podscentra does not store card, UPI, or netbanking details.</p>
+        </div>
       </aside>
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-black/10 bg-white p-4 dark:border-white/10 dark:bg-ink lg:hidden">
         <button

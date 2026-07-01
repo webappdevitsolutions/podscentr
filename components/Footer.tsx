@@ -12,15 +12,15 @@ const columns = [
   },
   {
     title: "Company",
-    links: ["About", "Careers", "Journal", "Sustainability", "Press"]
+    links: ["About Us", "Contact Us", "Journal"]
   },
   {
     title: "Support",
-    links: ["FAQ", "Shipping", "Returns", "Track Order", "Help Center"]
+    links: ["FAQ", "Shipping Policy", "Return & Refund Policy", "Track Order"]
   },
   {
     title: "Policies",
-    links: ["Privacy Policy", "Terms of Use", "Refund Policy", "Cookie Policy"]
+    links: ["Privacy Policy", "Terms & Conditions", "Cancellation Policy"]
   }
 ];
 
@@ -38,20 +38,16 @@ function hrefFor(label: string) {
     "Maroon Polo": "/hot-items",
     "Green Polo": "/hot-items",
     "Grey Polo": "/hot-items",
-    About: "/about",
-    Careers: "/about",
+    "About Us": "/about",
+    "Contact Us": "/contact",
     Journal: "/blog",
-    Sustainability: "/about",
-    Press: "/blog",
     FAQ: "/faq",
-    Shipping: "/shipping-policy",
-    Returns: "/return-policy",
+    "Shipping Policy": "/shipping-policy",
+    "Return & Refund Policy": "/return-refund-policy",
     "Track Order": "/track-order",
-    "Help Center": "/contact",
     "Privacy Policy": "/privacy-policy",
-    "Terms of Use": "/terms-and-conditions",
-    "Refund Policy": "/return-policy",
-    "Cookie Policy": "/privacy-policy"
+    "Terms & Conditions": "/terms-and-conditions",
+    "Cancellation Policy": "/cancellation-policy"
   };
 
   return map[label] ?? "/";
@@ -88,7 +84,11 @@ export function Footer() {
           <div>
             <h3 className="text-3xl font-black tracking-tight">Podscentra</h3>
             <p className="mt-4 text-sm leading-7 text-neutral-500">
-              Premium cotton polo t-shirts for everyday wear — always buy one, get one.
+              Premium cotton polo t-shirts for everyday wear - always buy one, get one.
+            </p>
+            <p className="mt-3 text-sm leading-7 text-neutral-500">
+              Need help? Call <a className="font-bold text-ink hover:text-accent" href="tel:+9101204217372">+91 0120 421 7372</a> or email{" "}
+              <a className="font-bold text-ink hover:text-accent" href="mailto:support@podscentra.com">support@podscentra.com</a>.
             </p>
             <div className="mt-5 flex gap-2">
               {[Instagram, Facebook, Youtube, Twitter].map((Icon, index) => (
@@ -123,7 +123,7 @@ export function Footer() {
         </div>
 
         <div className="flex flex-col gap-4 border-t border-black/10 py-5 text-xs text-neutral-500 lg:flex-row lg:items-center lg:justify-between">
-          <p>© 2026 Podscentra. All rights reserved.</p>
+          <p>Copyright 2026 Podscentra. All rights reserved.</p>
           <div className="flex flex-wrap gap-2">
             {["VISA", "MC", "UPI", "PAY"].map((item) => (
               <span key={item} className="rounded-lg border border-black/10 bg-white px-3 py-1 font-black text-neutral-600">
@@ -134,7 +134,7 @@ export function Footer() {
           <div className="flex gap-4">
             <Link href="/privacy-policy" className="hover:text-accent">Privacy</Link>
             <Link href="/terms-and-conditions" className="hover:text-accent">Terms</Link>
-            <Link href="/privacy-policy" className="hover:text-accent">Cookies</Link>
+            <Link href="/contact" className="hover:text-accent">Contact</Link>
           </div>
         </div>
       </div>

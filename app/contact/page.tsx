@@ -1,53 +1,52 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, Mail, MapPin, Phone } from "lucide-react";
+import { Mail, MapPin, Phone, Clock } from "lucide-react";
 
-const faqs = ["How fast is delivery?", "Can I change my order?", "Do you ship internationally?"];
-const supportItems = [
-  { Icon: Mail, text: "support@podscentra.com" },
-  { Icon: Phone, text: "+1 800 555 0199" },
-  { Icon: MapPin, text: "SoHo, New York" }
+const contactDetails = [
+  { Icon: Phone, label: "Phone", value: "+91 0120 421 7372", href: "tel:+9101204217372" },
+  { Icon: Mail, label: "Email", value: "support@podscentra.com", href: "mailto:support@podscentra.com" },
+  { Icon: Clock, label: "Business hours", value: "Monday to Saturday, 10:00 AM - 6:00 PM" },
+  { Icon: MapPin, label: "Address", value: "Business address will be updated here once finalized." }
 ];
 
 export default function ContactPage() {
-  const [open, setOpen] = useState(0);
   return (
     <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <h1 className="text-5xl font-black sm:text-7xl">Contact Podscentra</h1>
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_0.8fr]">
+      <p className="text-sm font-black uppercase tracking-[0.22em] text-accent">Contact Us</p>
+      <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Contact Podscentra</h1>
+      <p className="mt-5 max-w-3xl text-base leading-8 text-neutral-600 dark:text-neutral-300">
+        Business name: <span className="font-bold text-ink dark:text-white">Podscentra</span>. For order support, delivery questions, returns, refunds, or payment help, reach our support team during business hours.
+      </p>
+
+      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_0.85fr]">
         <form className="rounded-3xl bg-white p-6 shadow-sm dark:bg-white/5">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {["Name", "Email", "Subject"].map((field) => (
-              <input key={field} placeholder={field} className="focus-ring min-h-12 rounded-2xl border border-black/10 bg-transparent px-4 dark:border-white/10" />
-            ))}
-            <textarea placeholder="Message" className="focus-ring min-h-36 rounded-2xl border border-black/10 bg-transparent p-4 dark:border-white/10 sm:col-span-2" />
+          <h2 className="text-2xl font-black">Send us a message</h2>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <input name="name" placeholder="Name" className="focus-ring min-h-12 rounded-2xl border border-black/10 bg-transparent px-4 dark:border-white/10" />
+            <input name="email" type="email" placeholder="Email" className="focus-ring min-h-12 rounded-2xl border border-black/10 bg-transparent px-4 dark:border-white/10" />
+            <input name="phone" inputMode="tel" placeholder="Phone" className="focus-ring min-h-12 rounded-2xl border border-black/10 bg-transparent px-4 dark:border-white/10 sm:col-span-2" />
+            <textarea name="message" placeholder="Message" className="focus-ring min-h-36 rounded-2xl border border-black/10 bg-transparent p-4 dark:border-white/10 sm:col-span-2" />
           </div>
-          <button className="focus-ring mt-4 rounded-full bg-accent px-6 py-3 font-bold text-white">Send message</button>
+          <button type="button" className="focus-ring mt-4 rounded-full bg-accent px-6 py-3 font-bold text-white">
+            Send message
+          </button>
+          <p className="mt-3 text-xs leading-6 text-neutral-500">
+            This form records your message request in the browser only for now. For urgent support, call or email us directly.
+          </p>
         </form>
+
         <div className="grid gap-4">
-          {supportItems.map(({ Icon, text }) => (
-            <div key={text} className="rounded-3xl bg-white p-6 dark:bg-white/5">
+          {contactDetails.map(({ Icon, label, value, href }) => (
+            <div key={label} className="rounded-3xl bg-white p-6 dark:bg-white/5">
               <Icon className="text-accent" />
-              <p className="mt-3 font-black">{text}</p>
+              <p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-neutral-500">{label}</p>
+              {href ? (
+                <a href={href} className="mt-2 block text-lg font-black hover:text-accent">{value}</a>
+              ) : (
+                <p className="mt-2 text-lg font-black">{value}</p>
+              )}
             </div>
           ))}
-        </div>
-      </div>
-      <div className="mt-8 grid gap-8 lg:grid-cols-2">
-        <div className="flex min-h-80 items-center justify-center rounded-[2rem] bg-neutral-200 text-xl font-black text-neutral-500 dark:bg-white/10">
-          Interactive map preview
-        </div>
-        <div className="rounded-3xl bg-white p-6 dark:bg-white/5">
-          <h2 className="text-3xl font-black">Support FAQ</h2>
-          <div className="mt-5 grid gap-3">
-            {faqs.map((faq, index) => (
-              <button key={faq} onClick={() => setOpen(index)} className="rounded-2xl border border-black/10 p-4 text-left dark:border-white/10">
-                <span className="flex items-center justify-between font-bold">{faq}<ChevronDown /></span>
-                {open === index ? <p className="mt-3 text-sm text-neutral-500">Most requests are handled within one business day by the concierge team.</p> : null}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
     </section>
