@@ -12,6 +12,11 @@ if (!shouldSync) {
   process.exit(0);
 }
 
+if (databaseUrl.includes("railway.internal")) {
+  console.error("DATABASE_URL uses Railway's private internal host. Vercel needs Railway's public TCP proxy/Postgres URL instead.");
+  process.exit(1);
+}
+
 function runPrisma(args) {
   execFileSync(npxCommand, ["prisma", ...args], { stdio: "inherit" });
 }
@@ -20,7 +25,7 @@ try {
   runPrisma(["migrate", "deploy"]);
 } catch {
   console.warn("Prisma migrate deploy failed; falling back to prisma db push.");
-  runPrisma(["db", "push", "--skip-generate"]);
+  runPrisma(["db", "push"]);
 }
 
 const pool = new pg.Pool({
