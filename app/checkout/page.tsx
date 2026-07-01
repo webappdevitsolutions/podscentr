@@ -82,6 +82,7 @@ export default function CheckoutPage() {
   const [addressTouched, setAddressTouched] = useState<Partial<Record<keyof ShippingAddress, boolean>>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+  const [isCashfreeReady, setIsCashfreeReady] = useState(false);
 
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const deliveryCharge = deliveryChargeTable[deliveryMethod][paymentMethod];
@@ -164,6 +165,11 @@ export default function CheckoutPage() {
       throw new Error(result.error || "Could not start Cashfree payment.");
     }
 
+    console.info("Cashfree order created", {
+      order_id: result.order_id,
+      has_payment_session_id: Boolean(result.payment_session_id)
+    });
+
     return result as { payment_session_id: string; order_id: string };
   }
 
@@ -182,6 +188,30 @@ export default function CheckoutPage() {
     return Boolean(result.verified);
   }
 
+  async function waitForCashfreeSdk() {
+    if (window.Cashfree) {
+      setIsCashfreeReady(true);
+      return;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      let attempts = 0;
+      const timer = window.setInterval(() => {
+        attempts += 1;
+        if (window.Cashfree) {
+          window.clearInterval(timer);
+          setIsCashfreeReady(true);
+          resolve();
+          return;
+        }
+        if (attempts >= 32) {
+          window.clearInterval(timer);
+          reject(new Error("Payment gateway is still loading. Please try again in a moment."));
+        }
+      }, 250);
+    });
+  }
+
   async function handlePlaceOrder() {
     setPaymentError("");
     markAllAddressTouched();
@@ -192,31 +222,47 @@ export default function CheckoutPage() {
     try {
       if (paymentMethod === "Cash on Delivery") {
         const orderId = await createCodOrder();
+        redirectedForEmptyCart.current = true;
         clearCart();
-        router.push(`/order-success${orderId ? `?order_id=${orderId}` : ""}`);
+        router.push(`/order-success${orderId ? `?orderId=${encodeURIComponent(orderId)}` : ""}`);
         return;
-      }
-
-      if (!window.Cashfree) {
-        throw new Error("Cashfree checkout is still loading. Please try again in a moment.");
       }
 
       const cashfreeMode = process.env.NEXT_PUBLIC_CASHFREE_MODE === "production" ? "production" : "sandbox";
       const { payment_session_id, order_id } = await createCashfreeOrder();
+      await waitForCashfreeSdk();
+
+      if (!window.Cashfree) {
+        throw new Error("Payment gateway is still loading. Please try again in a moment.");
+      }
+
       const cashfree = window.Cashfree({ mode: cashfreeMode });
 
-      await cashfree.checkout({
-        paymentSessionId: payment_session_id,
-        redirectTarget: "_modal"
-      });
+      let checkoutResult: unknown;
+      try {
+        checkoutResult = await cashfree.checkout({
+          paymentSessionId: payment_session_id,
+          redirectTarget: "_modal"
+        });
+        console.info("Cashfree checkout closed", { order_id, checkoutResult });
+      } catch (checkoutError) {
+        console.error("Cashfree checkout open error", checkoutError);
+        throw new Error("Payment could not be started. Please check your details and try again.");
+      }
+
+      if (checkoutResult && typeof checkoutResult === "object" && "error" in checkoutResult) {
+        console.error("Cashfree checkout returned error", checkoutResult);
+        throw new Error("Payment was not completed. Your cart is still saved.");
+      }
 
       const verified = await verifyCashfreeOrder(order_id);
       if (!verified) {
-        throw new Error("Payment was not confirmed by Cashfree. If money was deducted, it will be reconciled automatically.");
+        throw new Error("Payment was not completed. Your cart is still saved.");
       }
 
+      redirectedForEmptyCart.current = true;
       clearCart();
-      router.push(`/order-success?order_id=${order_id}`);
+      router.push(`/order-success?orderId=${encodeURIComponent(order_id)}`);
     } catch (error) {
       console.error("Checkout error:", error);
       setPaymentError(error instanceof Error ? error.message : "Something went wrong. Please try again.");
@@ -226,11 +272,12 @@ export default function CheckoutPage() {
   }
 
   useEffect(() => {
+    if (isProcessing) return;
     if (!isReady || items.length > 0 || redirectedForEmptyCart.current) return;
     redirectedForEmptyCart.current = true;
     sessionStorage.setItem("podscentra-cart-message", "Your cart is empty");
     router.replace("/cart");
-  }, [isReady, items.length, router]);
+  }, [isProcessing, isReady, items.length, router]);
 
   function setAddressField(field: keyof ShippingAddress, value: string) {
     setAddress((current) => ({ ...current, [field]: value }));
@@ -375,7 +422,15 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      <Script src="https://sdk.cashfree.com/js/v3/cashfree.js" strategy="lazyOnload" />
+      <Script
+        src="https://sdk.cashfree.com/js/v3/cashfree.js"
+        strategy="afterInteractive"
+        onLoad={() => setIsCashfreeReady(true)}
+        onError={(error) => {
+          console.error("Cashfree SDK failed to load", error);
+          setIsCashfreeReady(false);
+        }}
+      />
       <aside className="h-fit rounded-3xl bg-white p-6 shadow-luxury dark:bg-white/5">
         <h2 className="text-2xl font-black">Order summary</h2>
         <div className="mt-5 grid gap-3">
@@ -402,7 +457,7 @@ export default function CheckoutPage() {
           onClick={handlePlaceOrder}
           className="focus-ring mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent px-5 text-sm font-bold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isProcessing ? "Processing..." : paymentMethod === "Cash on Delivery" ? "Place order" : `Pay ${formatCurrency(total)}`}
+          {isProcessing ? "Processing..." : paymentMethod === "Cash on Delivery" ? "Place order" : isCashfreeReady ? `Pay ${formatCurrency(total)}` : "Loading payment..."}
         </button>
         <LinkButton href="/cart" variant="ghost" className="mt-3 w-full">Back to cart</LinkButton>
       </aside>
@@ -413,7 +468,7 @@ export default function CheckoutPage() {
           onClick={handlePlaceOrder}
           className="focus-ring flex min-h-12 w-full items-center justify-center rounded-full bg-accent font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isProcessing ? "Processing..." : paymentMethod === "Cash on Delivery" ? "Place order" : `Pay ${formatCurrency(total)}`}
+          {isProcessing ? "Processing..." : paymentMethod === "Cash on Delivery" ? "Place order" : isCashfreeReady ? `Pay ${formatCurrency(total)}` : "Loading payment..."}
         </button>
       </div>
     </section>

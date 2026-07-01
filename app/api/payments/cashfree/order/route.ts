@@ -38,7 +38,7 @@ export async function POST(request: Request) {
         email: payload.customer.email,
         phone: payload.customer.phone
       },
-      returnUrl: `${origin}/order-success?order_id={order_id}`,
+      returnUrl: `${origin}/order-success?orderId={order_id}`,
       note: "Podscentra online order"
     });
     const updatedOrder = await prisma.order.update({
@@ -53,6 +53,12 @@ export async function POST(request: Request) {
         }
       },
       include: orderInclude
+    });
+    console.info("Cashfree order creation response", {
+      orderId: updatedOrder.id,
+      cashfreeOrderId: cashfreeOrder.order_id,
+      hasPaymentSessionId: Boolean(cashfreeOrder.payment_session_id),
+      status: cashfreeOrder.order_status || "ACTIVE"
     });
 
     return NextResponse.json({
