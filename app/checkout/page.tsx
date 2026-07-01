@@ -174,18 +174,25 @@ export default function CheckoutPage() {
   }
 
   async function verifyCashfreeOrder(orderId: string) {
-    const response = await fetch("/api/payments/cashfree/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ order_id: orderId })
-    });
-    const result = await response.json();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const response = await fetch("/api/payments/cashfree/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId })
+      });
+      const result = await response.json();
 
-    if (!response.ok) {
-      throw new Error(result.error || "Could not verify payment.");
+      if (!response.ok) {
+        throw new Error(result.error || "Could not verify payment.");
+      }
+
+      if (result.verified) return true;
+      if (attempt < 4) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1200));
+      }
     }
 
-    return Boolean(result.verified);
+    return false;
   }
 
   async function waitForCashfreeSdk() {
