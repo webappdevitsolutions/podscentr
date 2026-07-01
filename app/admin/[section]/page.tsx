@@ -1,8 +1,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { BarChart3, Boxes, ClipboardList, CreditCard, FileText, Megaphone, Package, Settings, Store, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { BarChart3, Boxes, ClipboardList, CreditCard, Download, FileText, Megaphone, Package, Settings, Store, Upload, Users } from "lucide-react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { useCatalog } from "@/hooks/useCatalog";
 import { readOrders, type SavedOrder } from "@/lib/orders";
@@ -32,6 +32,65 @@ function slugToTitle(value: string) {
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function CatalogMigrationTools() {
+  const { products, importProducts } = useCatalog();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [message, setMessage] = useState("");
+
+  function exportProducts() {
+    const blob = new Blob([JSON.stringify(products, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "catalog-products.json";
+    link.click();
+    URL.revokeObjectURL(url);
+    setMessage("Exported products JSON. Use it to update data/catalog-products.json before deploying.");
+  }
+
+  function importProductsJson(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        if (!Array.isArray(parsed)) {
+          setMessage("Import failed. The JSON file must contain an array of products.");
+          return;
+        }
+
+        importProducts(parsed);
+        setMessage(`Imported ${parsed.length} product${parsed.length === 1 ? "" : "s"} into this browser catalog.`);
+      } catch {
+        setMessage("Import failed. Check that the file is valid JSON.");
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  }
+
+  return (
+    <section className="mt-6 rounded-xl border border-black/10 bg-white p-6 shadow-sm">
+      <h2 className="text-lg font-bold">Catalog migration</h2>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+        Vercel reads deployed products from <span className="font-semibold text-neutral-800">data/catalog-products.json</span>. Export local products, replace that seed file with the JSON, commit, and deploy to make them shared.
+      </p>
+      <div className="mt-5 flex flex-wrap gap-3">
+        <button onClick={exportProducts} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-neutral-950 px-4 text-sm font-bold text-white hover:bg-neutral-800">
+          <Download size={16} /> Export products JSON
+        </button>
+        <button onClick={() => fileInputRef.current?.click()} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-black/10 px-4 text-sm font-bold hover:bg-neutral-50">
+          <Upload size={16} /> Import products JSON
+        </button>
+        <input ref={fileInputRef} type="file" accept="application/json,.json" onChange={importProductsJson} className="hidden" />
+      </div>
+      {message ? <p className="mt-4 rounded-lg bg-neutral-50 px-4 py-3 text-sm font-semibold text-neutral-700">{message}</p> : null}
+    </section>
+  );
 }
 
 function OrdersTable({ orders }: { orders: SavedOrder[] }) {
@@ -118,7 +177,8 @@ export default function AdminSectionPage() {
         <p className="text-sm font-semibold text-neutral-500">Admin</p>
         <h1 className="text-2xl font-bold tracking-tight">{copy.title}</h1>
         {section === "orders" ? <OrdersTable orders={orders} /> : null}
-        {section !== "orders" ? (
+        {section === "settings" ? <CatalogMigrationTools /> : null}
+        {section !== "orders" && section !== "settings" ? (
         <section className="mt-6 rounded-xl border border-black/10 bg-white p-8 text-center shadow-sm">
           <Icon className="mx-auto text-neutral-400" size={36} />
           <h2 className="mt-4 text-lg font-bold">{copy.title}</h2>

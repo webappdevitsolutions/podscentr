@@ -29,8 +29,8 @@ function splitText(value: string) {
 function DetailRow({ label, value }: { label: string; value?: string | number }) {
   return (
     <div className="grid grid-cols-[145px_1fr] gap-3 border-b border-black/5 py-3 text-sm last:border-b-0 dark:border-white/10">
-      <dt className="font-bold text-neutral-500 dark:text-neutral-400">{label}</dt>
-      <dd className="font-semibold text-neutral-900 dark:text-white">{value || "Not specified"}</dd>
+      <dt className="font-medium text-neutral-500 dark:text-neutral-400">{label}</dt>
+      <dd className="font-normal text-neutral-900 dark:text-white">{value || "Not specified"}</dd>
     </div>
   );
 }
@@ -58,7 +58,7 @@ function Accordion({ item, defaultOpen = false }: { item: AccordionItem; default
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex w-full items-center justify-between gap-4 py-5 text-left text-base font-black"
+        className="flex w-full items-center justify-between gap-4 py-5 text-left text-[15px] font-semibold sm:text-base"
       >
         <span>{item.title}</span>
         {open ? <ChevronUp size={19} /> : <ChevronDown size={19} />}
@@ -91,12 +91,12 @@ function DescriptionBlock({ description }: { description: string }) {
 
   return (
     <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-6">
-      <h2 className="text-xl font-black">Description</h2>
+      <h2 className="text-lg font-semibold">Description</h2>
       <div
         className="mt-4 overflow-hidden transition-[max-height] duration-500 ease-in-out"
         style={{ maxHeight: expanded || !hasLongDescription ? `${height}px` : "8.6rem" }}
       >
-        <div ref={contentRef} className="max-w-[680px] space-y-4 text-base leading-[1.7] text-neutral-650 dark:text-neutral-300">
+        <div ref={contentRef} className="max-w-[680px] space-y-4 text-[15px] font-normal leading-[1.75] text-neutral-650 dark:text-neutral-300 sm:text-base">
           {paragraphs.length ? (
             paragraphs.map((paragraph, index) => {
               const isBullet = /^[-*]/.test(paragraph);
@@ -117,7 +117,7 @@ function DescriptionBlock({ description }: { description: string }) {
               }
 
               if (isHeading) {
-                return <h3 key={paragraph} className="pt-2 text-base font-black text-neutral-950 dark:text-white">{paragraph}</h3>;
+                return <p key={paragraph} className="font-normal text-neutral-700 dark:text-neutral-300">{paragraph}</p>;
               }
 
               return <p key={`${paragraph}-${index}`}>{paragraph}</p>;
@@ -131,7 +131,7 @@ function DescriptionBlock({ description }: { description: string }) {
         <button
           type="button"
           onClick={() => setExpanded((current) => !current)}
-          className="mt-4 inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-2 text-sm font-black transition hover:border-neutral-950 dark:border-white/15"
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-2 text-sm font-semibold transition hover:border-neutral-950 dark:border-white/15"
         >
           {expanded ? "See Less" : "See More"} {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
@@ -148,9 +148,9 @@ function ReviewCard({ name, title, text }: { name: string; title: string; text: 
           <Star key={index} size={16} className="fill-amber-500" />
         ))}
       </div>
-      <h3 className="mt-4 font-black">{title}</h3>
+      <h3 className="mt-4 font-semibold">{title}</h3>
       <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{text}</p>
-      <p className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-neutral-400">{name}</p>
+      <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">{name}</p>
     </article>
   );
 }
@@ -279,15 +279,15 @@ export function ProductDetails({ product }: { product: Product }) {
 
         <div className="lg:sticky lg:top-24 lg:self-start">
           <div className="max-w-[680px]">
-            <p className="text-sm font-black uppercase tracking-[0.2em] text-accent">{product.category}</p>
-            <h1 className="mt-3 text-4xl font-black leading-tight tracking-tight text-neutral-950 dark:text-white sm:text-5xl lg:text-6xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">{product.category}</p>
+            <h1 className="mt-3 text-[24px] font-bold leading-tight tracking-normal text-neutral-950 dark:text-white sm:text-[30px] lg:text-[34px]">
               {product.name}
             </h1>
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <span className="text-3xl font-black text-neutral-950 dark:text-white">{formatCurrency(product.price)}</span>
+              <span className="text-[21px] font-bold text-neutral-950 dark:text-white sm:text-2xl">{formatCurrency(product.price)}</span>
               {comparePrice && comparePrice > product.price ? (
-                <span className="text-lg font-bold text-neutral-400 line-through">{formatCurrency(comparePrice)}</span>
+                <span className="text-base font-medium text-neutral-400 line-through">{formatCurrency(comparePrice)}</span>
               ) : null}
               {discount ? (
                 <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-emerald-700">
@@ -300,8 +300,8 @@ export function ProductDetails({ product }: { product: Product }) {
 
             <div className="mt-8">
               <div className="mb-3 flex items-center justify-between gap-4">
-                <p className="font-black">Size</p>
-                <button type="button" className="inline-flex items-center gap-1 text-sm font-bold text-neutral-500 underline-offset-4 hover:text-neutral-950 hover:underline dark:text-neutral-400 dark:hover:text-white">
+                <p className="font-semibold">Size</p>
+                <button type="button" className="inline-flex items-center gap-1 text-sm font-medium text-neutral-500 underline-offset-4 hover:text-neutral-950 hover:underline dark:text-neutral-400 dark:hover:text-white">
                   <Ruler size={15} /> Size guide
                 </button>
               </div>
@@ -313,7 +313,7 @@ export function ProductDetails({ product }: { product: Product }) {
                       setSize(item);
                       setSizeError("");
                     }}
-                    className={`focus-ring grid h-11 min-w-12 place-items-center rounded-lg border px-4 text-sm font-black transition ${
+                    className={`focus-ring grid h-11 min-w-12 place-items-center rounded-lg border px-4 text-sm font-semibold transition ${
                       size === item
                         ? "border-neutral-950 bg-neutral-950 text-white dark:border-white dark:bg-white dark:text-neutral-950"
                         : "border-black/10 bg-white text-neutral-950 hover:border-neutral-950 dark:border-white/10 dark:bg-white/5 dark:text-white"
@@ -328,13 +328,13 @@ export function ProductDetails({ product }: { product: Product }) {
 
             {availableColors.length ? (
               <div className="mt-6">
-                <p className="mb-3 font-black">Color</p>
+                <p className="mb-3 font-semibold">Color</p>
                 <div className="flex flex-wrap gap-2">
                   {availableColors.map((item) => (
                     <button
                       key={item}
                       onClick={() => setColor(item)}
-                      className={`focus-ring rounded-lg border px-4 py-2 text-sm font-black transition ${
+                      className={`focus-ring rounded-lg border px-4 py-2 text-sm font-semibold transition ${
                         color === item
                           ? "border-accent bg-accent text-white"
                           : "border-black/10 bg-white text-neutral-950 hover:border-accent dark:border-white/10 dark:bg-white/5 dark:text-white"
@@ -348,12 +348,12 @@ export function ProductDetails({ product }: { product: Product }) {
             ) : null}
 
             <div className="mt-7">
-              <p className="mb-3 font-black">Quantity</p>
+              <p className="mb-3 font-semibold">Quantity</p>
               <div className="inline-flex h-12 items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-white/5">
                 <button className="grid h-full w-12 place-items-center" onClick={() => setQuantity(Math.max(1, quantity - 1))} aria-label="Decrease quantity">
                   <Minus size={17} />
                 </button>
-                <span className="min-w-10 text-center font-black">{quantity}</span>
+                <span className="min-w-10 text-center font-semibold">{quantity}</span>
                 <button className="grid h-full w-12 place-items-center" onClick={() => setQuantity(quantity + 1)} aria-label="Increase quantity">
                   <Plus size={17} />
                 </button>
@@ -361,10 +361,10 @@ export function ProductDetails({ product }: { product: Product }) {
             </div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              <button onClick={addToCart} className="focus-ring flex min-h-[56px] w-full items-center justify-center rounded-full border border-neutral-950 bg-white px-6 text-sm font-black text-neutral-950 transition hover:-translate-y-0.5 hover:bg-neutral-950 hover:text-white hover:shadow-lg dark:border-white dark:bg-white dark:text-neutral-950">
+              <button onClick={addToCart} className="focus-ring flex min-h-[56px] w-full items-center justify-center rounded-full border border-neutral-950 bg-white px-6 text-sm font-semibold text-neutral-950 transition hover:-translate-y-0.5 hover:bg-neutral-950 hover:text-white hover:shadow-lg dark:border-white dark:bg-white dark:text-neutral-950">
                 Add to Cart
               </button>
-              <button onClick={buyNow} className="focus-ring flex min-h-[56px] w-full items-center justify-center rounded-full bg-neutral-950 px-6 text-sm font-black text-white shadow-lg shadow-black/15 transition hover:-translate-y-0.5 hover:bg-accent hover:shadow-xl dark:bg-white dark:text-neutral-950 dark:hover:bg-accent dark:hover:text-white">
+              <button onClick={buyNow} className="focus-ring flex min-h-[56px] w-full items-center justify-center rounded-full bg-neutral-950 px-6 text-sm font-semibold text-white shadow-lg shadow-black/15 transition hover:-translate-y-0.5 hover:bg-accent hover:shadow-xl dark:bg-white dark:text-neutral-950 dark:hover:bg-accent dark:hover:text-white">
                 Buy Now
               </button>
             </div>
@@ -395,7 +395,7 @@ export function ProductDetails({ product }: { product: Product }) {
             ["Secure Payments", "Encrypted checkout"]
           ].map(([title, text]) => (
             <div key={title} className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
-              <p className="font-black">{title}</p>
+              <p className="font-semibold">{title}</p>
               <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{text}</p>
             </div>
           ))}
@@ -406,18 +406,18 @@ export function ProductDetails({ product }: { product: Product }) {
         <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-8">
           <div className="flex flex-wrap items-end justify-between gap-5">
             <div>
-              <h2 className="text-3xl font-black tracking-tight">Customer Reviews</h2>
+              <h2 className="text-2xl font-semibold tracking-tight">Customer Reviews</h2>
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <span className="flex text-amber-500">
                   {Array.from({ length: 5 }).map((_, index) => (
                     <Star key={index} size={20} className="fill-amber-500" />
                   ))}
                 </span>
-                <span className="text-xl font-black">{rating.toFixed(1)}</span>
+                <span className="text-xl font-semibold">{rating.toFixed(1)}</span>
                 <span className="text-sm font-bold text-neutral-500">{reviews} Reviews</span>
               </div>
             </div>
-            <button className="focus-ring rounded-xl border border-neutral-950 px-5 py-3 text-sm font-black transition hover:bg-neutral-950 hover:text-white dark:border-white">
+            <button className="focus-ring rounded-xl border border-neutral-950 px-5 py-3 text-sm font-semibold transition hover:bg-neutral-950 hover:text-white dark:border-white">
               Write a review
             </button>
           </div>
@@ -434,12 +434,12 @@ export function ProductDetails({ product }: { product: Product }) {
         <div className="mx-auto grid max-w-md grid-cols-[auto_1fr_1fr] items-center gap-2">
           <div className="min-w-0">
             <p className="truncate text-xs font-bold text-neutral-500">{product.name}</p>
-            <p className="font-black">{formatCurrency(product.price)}</p>
+            <p className="font-semibold">{formatCurrency(product.price)}</p>
           </div>
-          <button onClick={addToCart} className="min-h-11 rounded-full border border-neutral-950 bg-white px-3 text-xs font-black text-neutral-950">
+          <button onClick={addToCart} className="min-h-11 rounded-full border border-neutral-950 bg-white px-3 text-xs font-semibold text-neutral-950">
             Add to Cart
           </button>
-          <button onClick={buyNow} className="min-h-11 rounded-full bg-neutral-950 px-3 text-xs font-black text-white">
+          <button onClick={buyNow} className="min-h-11 rounded-full bg-neutral-950 px-3 text-xs font-semibold text-white">
             Buy Now
           </button>
         </div>

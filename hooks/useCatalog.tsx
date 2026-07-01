@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { type Product, type ProductVariant } from "@/data/products";
+import catalogSeed from "@/data/catalog-products.json";
 
 export type ProductStatus = "Active" | "Draft" | "Archived";
 export type Marketplace = "Amazon" | "Flipkart" | "Meesho" | "Myntra" | "Other" | "Manual";
@@ -51,6 +52,7 @@ type CatalogContextValue = {
   deleteProduct: (id: string) => void;
   setProductStatus: (id: string, status: ProductStatus) => void;
   adjustStock: (id: string, stock: number) => void;
+  importProducts: (products: Partial<CatalogProduct>[]) => void;
 };
 
 const catalogStorageKey = "podscentra-catalog-products";
@@ -133,19 +135,28 @@ function normalizeProduct(input: Partial<CatalogProduct>): CatalogProduct {
 }
 
 function loadInitialProducts() {
+  const seedProducts = (catalogSeed as Partial<CatalogProduct>[]).map(normalizeProduct);
   if (typeof window === "undefined") return [];
 
   const saved = localStorage.getItem(catalogStorageKey);
-  if (saved) return (JSON.parse(saved) as Partial<CatalogProduct>[]).map(normalizeProduct);
+  if (saved) {
+    try {
+      return (JSON.parse(saved) as Partial<CatalogProduct>[]).map(normalizeProduct);
+    } catch {
+      localStorage.removeItem(catalogStorageKey);
+      return seedProducts;
+    }
+  }
 
   const oldCrm = localStorage.getItem(oldCrmStorageKey);
-  if (!oldCrm) return [];
+  if (!oldCrm) return seedProducts;
 
   try {
     const parsed = JSON.parse(oldCrm) as { products?: Partial<CatalogProduct>[] };
-    return (parsed.products || []).map(normalizeProduct);
+    const migratedProducts = (parsed.products || []).map(normalizeProduct);
+    return migratedProducts.length ? migratedProducts : seedProducts;
   } catch {
-    return [];
+    return seedProducts;
   }
 }
 
@@ -188,6 +199,10 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     setProducts((current) => current.map((product) => (product.id === id ? { ...product, stock: Math.max(0, stock) } : product)));
   }, []);
 
+  const importProducts = useCallback((nextProducts: Partial<CatalogProduct>[]) => {
+    setProducts(nextProducts.map(normalizeProduct));
+  }, []);
+
   const value = useMemo<CatalogContextValue>(() => {
     const activeProducts = products.filter((product) => product.status === "Active");
     const categories = ["All", ...Array.from(new Set(activeProducts.map((product) => product.category).filter(Boolean)))];
@@ -200,9 +215,10 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       updateProduct,
       deleteProduct,
       setProductStatus,
-      adjustStock
+      adjustStock,
+      importProducts
     };
-  }, [addProduct, adjustStock, deleteProduct, products, setProductStatus, updateProduct]);
+  }, [addProduct, adjustStock, deleteProduct, importProducts, products, setProductStatus, updateProduct]);
 
   return <CatalogContext.Provider value={value}>{children}</CatalogContext.Provider>;
 }
