@@ -13,8 +13,8 @@ export type SavedOrder = {
   paymentMethod: string;
   paymentGateway: string;
   paymentStatus: string;
-  cashfreeOrderId: string;
-  cashfreePaymentId: string;
+  gatewayOrderId: string;
+  gatewayPaymentId: string;
   deliveryMethod: "Standard Delivery" | "Express Delivery";
   deliveryTime: string;
   deliveryCharge: number;

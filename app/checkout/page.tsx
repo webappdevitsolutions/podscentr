@@ -22,11 +22,39 @@ const deliveryMethods = [
 
 declare global {
   interface Window {
-    Cashfree?: (options: { mode: "sandbox" | "production" }) => {
-      checkout: (options: { paymentSessionId: string; redirectTarget?: "_self" | "_blank" | "_top" | "_modal" }) => Promise<unknown>;
+    Razorpay?: new (options: RazorpayOptions) => {
+      open: () => void;
+      on: (event: "payment.failed", callback: (response: unknown) => void) => void;
     };
   }
 }
+
+type RazorpayCheckoutResponse = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+type RazorpayOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill: {
+    name: string;
+    email: string;
+    contact: string;
+  };
+  theme: {
+    color: string;
+  };
+  modal: {
+    ondismiss: () => void;
+  };
+  handler: (response: RazorpayCheckoutResponse) => void;
+};
 
 const indianStates = ["Delhi", "Maharashtra", "Uttar Pradesh", "Karnataka", "Gujarat", "Tamil Nadu", "Rajasthan", "West Bengal", "Telangana", "Kerala"];
 
@@ -84,7 +112,7 @@ export default function CheckoutPage() {
   const [addressTouched, setAddressTouched] = useState<Partial<Record<keyof ShippingAddress, boolean>>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState("");
-  const [isCashfreeReady, setIsCashfreeReady] = useState(false);
+  const [isRazorpayReady, setIsRazorpayReady] = useState(false);
 
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const deliveryCharge = deliveryChargeTable[deliveryMethod][paymentMethod];
@@ -157,52 +185,44 @@ export default function CheckoutPage() {
     return result.order?.id as string | undefined;
   }
 
-  async function createCashfreeOrder() {
-    const response = await fetch("/api/payments/cashfree/order", {
+  async function createRazorpayOrder() {
+    const response = await fetch("/api/payments/razorpay/order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(checkoutPayload)
     });
     const result = await response.json();
 
-    if (!response.ok || !result.payment_session_id || !result.order_id) {
-      const detail = result.details ? ` ${result.details}` : "";
-      throw new Error(`${result.error || "Could not start Cashfree payment."}${detail}`);
+    if (!response.ok || !result.razorpayOrderId || !result.orderId || !result.key) {
+      throw new Error(result.error || "Payment could not be started. Please check your details and try again.");
     }
 
-    console.info("Cashfree order created", {
-      order_id: result.order_id,
-      has_payment_session_id: Boolean(result.payment_session_id)
+    console.info("Razorpay order created", {
+      orderId: result.orderId,
+      razorpayOrderId: result.razorpayOrderId
     });
 
-    return result as { payment_session_id: string; order_id: string };
+    return result as { orderId: string; razorpayOrderId: string; amount: number; currency: string; key: string };
   }
 
-  async function verifyCashfreeOrder(orderId: string) {
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const response = await fetch("/api/payments/cashfree/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: orderId })
-      });
-      const result = await response.json();
+  async function verifyRazorpayPayment(orderId: string, payment: RazorpayCheckoutResponse) {
+    const response = await fetch("/api/payments/razorpay/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId, ...payment })
+    });
+    const result = await response.json();
 
-      if (!response.ok) {
-        throw new Error(result.error || "Could not verify payment.");
-      }
-
-      if (result.verified) return true;
-      if (attempt < 4) {
-        await new Promise((resolve) => window.setTimeout(resolve, 1200));
-      }
+    if (!response.ok || !result.verified) {
+      throw new Error(result.error || "Payment verification failed.");
     }
 
-    return false;
+    return true;
   }
 
-  async function waitForCashfreeSdk() {
-    if (window.Cashfree) {
-      setIsCashfreeReady(true);
+  async function waitForRazorpaySdk() {
+    if (window.Razorpay) {
+      setIsRazorpayReady(true);
       return;
     }
 
@@ -210,9 +230,9 @@ export default function CheckoutPage() {
       let attempts = 0;
       const timer = window.setInterval(() => {
         attempts += 1;
-        if (window.Cashfree) {
+        if (window.Razorpay) {
           window.clearInterval(timer);
-          setIsCashfreeReady(true);
+          setIsRazorpayReady(true);
           resolve();
           return;
         }
@@ -221,6 +241,50 @@ export default function CheckoutPage() {
           reject(new Error("Payment gateway is still loading. Please try again in a moment."));
         }
       }, 250);
+    });
+  }
+
+  async function openRazorpayCheckout(order: { orderId: string; razorpayOrderId: string; amount: number; currency: string; key: string }) {
+    await waitForRazorpaySdk();
+
+    if (!window.Razorpay) {
+      throw new Error("Payment gateway is still loading. Please try again in a moment.");
+    }
+
+    const Razorpay = window.Razorpay;
+
+    return new Promise<"verified" | "dismissed">((resolve, reject) => {
+      const razorpay = new Razorpay({
+        key: order.key,
+        amount: order.amount,
+        currency: order.currency,
+        name: "Podscentra",
+        description: `Order ${order.orderId}`,
+        order_id: order.razorpayOrderId,
+        prefill: {
+          name: address.fullName,
+          email: address.email,
+          contact: address.phone
+        },
+        theme: {
+          color: "#7c3aed"
+        },
+        modal: {
+          ondismiss: () => resolve("dismissed")
+        },
+        handler: (response) => {
+          verifyRazorpayPayment(order.orderId, response)
+            .then(() => resolve("verified"))
+            .catch(() => reject(new Error("Payment verification failed.")));
+        }
+      });
+
+      razorpay.on("payment.failed", (response) => {
+        console.error("Razorpay payment failed", response);
+        reject(new Error("Payment failed. Your cart is still saved."));
+      });
+
+      razorpay.open();
     });
   }
 
@@ -258,41 +322,17 @@ export default function CheckoutPage() {
         return;
       }
 
-      const cashfreeMode = process.env.NEXT_PUBLIC_CASHFREE_MODE === "production" ? "production" : "sandbox";
-      const { payment_session_id, order_id } = await createCashfreeOrder();
-      await waitForCashfreeSdk();
+      const razorpayOrder = await createRazorpayOrder();
+      const checkoutResult = await openRazorpayCheckout(razorpayOrder);
 
-      if (!window.Cashfree) {
-        throw new Error("Payment gateway is still loading. Please try again in a moment.");
-      }
-
-      const cashfree = window.Cashfree({ mode: cashfreeMode });
-
-      let checkoutResult: unknown;
-      try {
-        checkoutResult = await cashfree.checkout({
-          paymentSessionId: payment_session_id,
-          redirectTarget: "_modal"
-        });
-        console.info("Cashfree checkout closed", { order_id, checkoutResult });
-      } catch (checkoutError) {
-        console.error("Cashfree checkout open error", checkoutError);
-        throw new Error("Payment could not be started. Please check your details and try again.");
-      }
-
-      if (checkoutResult && typeof checkoutResult === "object" && "error" in checkoutResult) {
-        console.error("Cashfree checkout returned error", checkoutResult);
-        throw new Error("Payment was not completed. Your cart is still saved.");
-      }
-
-      const verified = await verifyCashfreeOrder(order_id);
-      if (!verified) {
-        throw new Error("Payment was not completed. Your cart is still saved.");
+      if (checkoutResult === "dismissed") {
+        setPaymentError("Payment window closed. Your cart is still saved.");
+        return;
       }
 
       redirectedForEmptyCart.current = true;
       clearCart();
-      router.push(`/order-success?orderId=${encodeURIComponent(order_id)}`);
+      router.push(`/order-success?orderId=${encodeURIComponent(razorpayOrder.orderId)}`);
     } catch (error) {
       console.error("Checkout error:", error);
       setPaymentError(error instanceof Error ? error.message : "Something went wrong. Please try again.");
@@ -449,7 +489,7 @@ export default function CheckoutPage() {
             </div>
             {paymentMethod === "Online Payment" ? (
               <div className="mt-5 rounded-2xl border border-black/10 p-4 text-sm leading-6 text-neutral-500 transition dark:border-white/10 dark:text-neutral-400">
-                Payments are processed securely through Cashfree. Podscentra does not store card, UPI, or netbanking details.
+                Payments are securely processed by Razorpay. Podscentra never stores card, UPI or netbanking details.
               </div>
             ) : null}
             {paymentMethod === "Cash on Delivery" ? (
@@ -468,12 +508,12 @@ export default function CheckoutPage() {
       </div>
 
       <Script
-        src="https://sdk.cashfree.com/js/v3/cashfree.js"
+        src="https://checkout.razorpay.com/v1/checkout.js"
         strategy="afterInteractive"
-        onLoad={() => setIsCashfreeReady(true)}
+        onLoad={() => setIsRazorpayReady(true)}
         onError={(error) => {
-          console.error("Cashfree SDK failed to load", error);
-          setIsCashfreeReady(false);
+          console.error("Razorpay SDK failed to load", error);
+          setIsRazorpayReady(false);
         }}
       />
       <aside className="h-fit rounded-3xl bg-white p-6 shadow-luxury dark:bg-white/5">
@@ -502,12 +542,12 @@ export default function CheckoutPage() {
           onClick={handlePlaceOrder}
           className="focus-ring mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent px-5 text-sm font-bold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isProcessing ? "Processing..." : paymentMethod === "Cash on Delivery" ? "Place order" : isCashfreeReady ? `Pay ${formatCurrency(total)}` : "Loading payment..."}
+          {isProcessing ? "Processing..." : paymentMethod === "Cash on Delivery" ? "Place order" : isRazorpayReady ? `Pay ${formatCurrency(total)}` : "Loading payment..."}
         </button>
         <LinkButton href="/cart" variant="ghost" className="mt-3 w-full">Back to cart</LinkButton>
         <div className="mt-5 rounded-2xl bg-neutral-50 p-4 text-xs leading-6 text-neutral-500 dark:bg-white/5 dark:text-neutral-400">
           <p className="font-bold text-ink dark:text-white">Need help? Contact us at +91 0120 421 7372.</p>
-          <p className="mt-1">Payments are processed securely through Cashfree. Podscentra does not store card, UPI, or netbanking details.</p>
+          <p className="mt-1">Payments are securely processed by Razorpay. Podscentra never stores card, UPI or netbanking details.</p>
         </div>
       </aside>
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-black/10 bg-white p-4 dark:border-white/10 dark:bg-ink lg:hidden">
@@ -517,7 +557,7 @@ export default function CheckoutPage() {
           onClick={handlePlaceOrder}
           className="focus-ring flex min-h-12 w-full items-center justify-center rounded-full bg-accent font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isProcessing ? "Processing..." : paymentMethod === "Cash on Delivery" ? "Place order" : isCashfreeReady ? `Pay ${formatCurrency(total)}` : "Loading payment..."}
+          {isProcessing ? "Processing..." : paymentMethod === "Cash on Delivery" ? "Place order" : isRazorpayReady ? `Pay ${formatCurrency(total)}` : "Loading payment..."}
         </button>
       </div>
     </section>

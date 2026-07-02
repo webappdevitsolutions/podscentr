@@ -49,8 +49,8 @@ export type SerializedOrder = {
   paymentMethod: string;
   paymentGateway: string;
   paymentStatus: string;
-  cashfreeOrderId: string;
-  cashfreePaymentId: string;
+  gatewayOrderId: string;
+  gatewayPaymentId: string;
   deliveryMethod: string;
   deliveryTime: string;
   deliveryCharge: number;
@@ -150,12 +150,11 @@ export async function createCheckoutOrder(
   options: {
     id?: string;
     paymentMethodCode: "ONLINE" | "COD";
-    paymentGateway: "CASHFREE" | "COD";
+    paymentGateway: "RAZORPAY" | "COD";
     paymentStatus: "Pending" | "COD_PENDING" | "Paid" | "Failed";
     orderStatus: OrderStatus;
-    cashfreeOrderId?: string;
-    cfOrderId?: string;
-    cashfreePaymentId?: string;
+    gatewayOrderId?: string;
+    gatewayPaymentId?: string;
   }
 ) {
   const errors = validateCheckoutPayload(payload);
@@ -234,10 +233,16 @@ export async function createCheckoutOrder(
           method: options.paymentMethodCode,
           gateway: options.paymentGateway,
           amount: total,
-          status: options.paymentStatus === "COD_PENDING" ? PaymentStatus.COD_PENDING : PaymentStatus.Pending,
-          gatewayOrderId: options.cashfreeOrderId,
-          cfOrderId: options.cfOrderId,
-          gatewayPaymentId: options.cashfreePaymentId,
+          status:
+            options.paymentStatus === "COD_PENDING"
+              ? PaymentStatus.COD_PENDING
+              : options.paymentStatus === "Paid"
+                ? PaymentStatus.Paid
+                : options.paymentStatus === "Failed"
+                  ? PaymentStatus.Failed
+                  : PaymentStatus.Pending,
+          gatewayOrderId: options.gatewayOrderId,
+          gatewayPaymentId: options.gatewayPaymentId,
           rawStatus: options.paymentStatus
         }
       }
@@ -280,8 +285,8 @@ export function serializeOrder(order: OrderWithRelations): SerializedOrder {
     paymentMethod: order.paymentMethod,
     paymentGateway: order.paymentGateway,
     paymentStatus: order.paymentStatus,
-    cashfreeOrderId: order.payment?.gatewayOrderId || "",
-    cashfreePaymentId: order.payment?.gatewayPaymentId || "",
+    gatewayOrderId: order.payment?.gatewayOrderId || "",
+    gatewayPaymentId: order.payment?.gatewayPaymentId || "",
     deliveryMethod: order.deliveryMethod,
     deliveryTime: order.deliveryTime,
     deliveryCharge: order.deliveryCharge,

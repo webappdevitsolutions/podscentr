@@ -31,7 +31,7 @@ export default function TermsPage() {
         {
           title: "Payments",
           body: [
-            "Online payments are processed through Cashfree using supported payment modes. Podscentra does not store sensitive card, UPI, wallet, or netbanking credentials.",
+            "Online payments are securely processed by Razorpay using supported payment modes. Podscentra does not store sensitive card, UPI, wallet, or netbanking credentials.",
             "Cash on Delivery availability may depend on order value, delivery location, risk checks, and courier serviceability."
           ]
         },

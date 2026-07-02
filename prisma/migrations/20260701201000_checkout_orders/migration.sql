@@ -1,4 +1,4 @@
--- Extend order and payment statuses for Cashfree/COD checkout.
+-- Extend order and payment statuses for online/COD checkout.
 ALTER TYPE "OrderStatus" ADD VALUE IF NOT EXISTS 'Confirmed';
 ALTER TYPE "OrderStatus" ADD VALUE IF NOT EXISTS 'Processing';
 ALTER TYPE "OrderStatus" ADD VALUE IF NOT EXISTS 'Paid';

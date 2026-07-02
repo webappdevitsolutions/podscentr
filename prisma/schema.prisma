@@ -200,5 +200,6 @@ model Payment {
   cfOrderId        String?
   gatewayPaymentId String?
   rawStatus        String        @default("")
+  paidAt           DateTime?
   createdAt        DateTime      @default(now())
 }

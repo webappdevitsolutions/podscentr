@@ -11,7 +11,7 @@ export default function AboutPage() {
             Podscentra offers curated apparel and lifestyle products through a simple, secure online shopping experience. We focus on clear product information, reliable checkout, responsive customer support, and transparent policies for shipping, returns, refunds, cancellations, and payments.
           </p>
           <p className="mt-4 text-base leading-8 text-neutral-600 dark:text-neutral-300">
-            Payments are processed securely through Cashfree, and Podscentra does not store card, UPI, or netbanking details. Customers can also reach us at +91 0120 421 7372 or support@podscentra.com for order help.
+            Payments are securely processed by Razorpay. Podscentra never stores card, UPI or netbanking details. Customers can also reach us at +91 0120 421 7372 or support@podscentra.com for order help.
           </p>
         </div>
         <div className="relative aspect-[4/5] overflow-hidden rounded-[2rem] shadow-luxury">
@@ -21,7 +21,7 @@ export default function AboutPage() {
       <div className="bg-white py-14 dark:bg-black">
         <div className="mx-auto grid max-w-7xl gap-5 px-4 sm:px-6 md:grid-cols-3 lg:px-8">
           {[
-            ["Secure payments", "Online payments are processed through Cashfree."],
+            ["Secure payments", "Online payments are processed through Razorpay."],
             ["Customer support", "Support is available Monday to Saturday, 10:00 AM - 6:00 PM."],
             ["Transparent policies", "Shipping, return, refund, and cancellation terms are published clearly."]
           ].map(([title, text]) => (

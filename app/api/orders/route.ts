@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const payload = (await request.json()) as CheckoutPayload;
 
     if (payload.paymentMethod !== "Cash on Delivery") {
-      return NextResponse.json({ error: "Use Cashfree route for online payments." }, { status: 400 });
+      return NextResponse.json({ error: "Use Razorpay route for online payments." }, { status: 400 });
     }
 
     const order = await createCheckoutOrder(payload, {

@@ -15,10 +15,10 @@ export default function PrivacyPolicyPage() {
           ]
         },
         {
-          title: "Payments And Cashfree",
+          title: "Payments And Razorpay",
           body: [
-            "Online payments are processed securely through Cashfree. Podscentra does not store card, UPI, netbanking, wallet, or sensitive payment authentication details on its servers.",
-            "Cashfree may process payment-related information as required to complete the transaction, verify payment status, prevent fraud, and comply with applicable law."
+            "Online payments are securely processed by Razorpay. Podscentra does not store card, UPI, netbanking, wallet, or sensitive payment authentication details on its servers.",
+            "Razorpay may process payment-related information as required to complete the transaction, verify payment status, prevent fraud, and comply with applicable law."
           ]
         },
         {

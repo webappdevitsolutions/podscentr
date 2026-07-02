@@ -4,9 +4,9 @@ const requiredServerEnv = [
   "ADMIN_PASSWORD",
   "NEXTAUTH_SECRET",
   "JWT_SECRET",
-  "CASHFREE_APP_ID",
-  "CASHFREE_SECRET_KEY",
-  "CASHFREE_ENV"
+  "RAZORPAY_KEY_ID",
+  "RAZORPAY_KEY_SECRET",
+  "NEXT_PUBLIC_RAZORPAY_KEY_ID"
 ] as const;
 
 export function getMissingProductionEnv() {

@@ -121,7 +121,7 @@ function OrdersTable({ orders }: { orders: SavedOrder[] }) {
               <th className="px-4 py-3">Items</th>
               <th className="px-4 py-3">Payment Method</th>
               <th className="px-4 py-3">Payment Status</th>
-              <th className="px-4 py-3">Cashfree IDs</th>
+              <th className="px-4 py-3">Gateway IDs</th>
               <th className="px-4 py-3">Delivery Method</th>
               <th className="px-4 py-3">Delivery Charge</th>
               <th className="px-4 py-3">Order Status</th>
@@ -153,8 +153,8 @@ function OrdersTable({ orders }: { orders: SavedOrder[] }) {
                 <td className="px-4 py-3 font-semibold">{order.paymentMethod}</td>
                 <td className="px-4 py-3 font-semibold">{order.paymentStatus}</td>
                 <td className="max-w-[180px] px-4 py-3 text-xs text-neutral-500">
-                  <p>{order.cashfreeOrderId || "-"}</p>
-                  <p>{order.cashfreePaymentId || "-"}</p>
+                  <p>{order.gatewayOrderId || "-"}</p>
+                  <p>{order.gatewayPaymentId || "-"}</p>
                 </td>
                 <td className="px-4 py-3">
                   <p className="font-semibold">{order.deliveryMethod}</p>
