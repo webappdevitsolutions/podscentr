@@ -107,6 +107,10 @@ const emptyState: EditorState = {
 };
 
 const marketplaces: Marketplace[] = ["Manual", "Amazon", "Flipkart", "Meesho", "Myntra", "Other"];
+const maxOriginalImageBytes = 6 * 1024 * 1024;
+const maxCompressedImageBytes = 900 * 1024;
+const maxInlineMediaBytes = 2.5 * 1024 * 1024;
+const productDataTooLargeMessage = "Product data is too large. Please reduce image size or use an image URL.";
 
 function slugify(value: string) {
   return value
@@ -119,6 +123,85 @@ function slugify(value: string) {
 function currencyNumber(value: string) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function dataUrlSize(value: string) {
+  if (!value.startsWith("data:")) return 0;
+  const base64 = value.split(",")[1] || "";
+  return Math.ceil((base64.length * 3) / 4);
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function loadImage(url: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = url;
+  });
+}
+
+async function compressImageFile(file: File) {
+  if (file.size > maxOriginalImageBytes) {
+    throw new Error(productDataTooLargeMessage);
+  }
+
+  if (!file.type.startsWith("image/") || file.type === "image/svg+xml" || file.type === "image/gif") {
+    if (file.size > maxCompressedImageBytes) throw new Error(productDataTooLargeMessage);
+    return blobToDataUrl(file);
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await loadImage(objectUrl);
+    const maxDimension = 1200;
+    const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+    const width = Math.max(1, Math.round(image.width * scale));
+    const height = Math.max(1, Math.round(image.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Image upload failed. Try a smaller image.");
+    context.drawImage(image, 0, 0, width, height);
+
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.78));
+    if (!blob || blob.size > maxCompressedImageBytes) {
+      throw new Error(productDataTooLargeMessage);
+    }
+
+    return blobToDataUrl(blob);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function readAdminResponse(response: Response, fallbackError: string) {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    console.error("Admin API returned non-JSON response", {
+      status: response.status,
+      body: text.slice(0, 160)
+    });
+
+    if (response.status === 413 || text.toLowerCase().startsWith("request entity too large") || text.toLowerCase().includes("request entity")) {
+      return { error: productDataTooLargeMessage };
+    }
+
+    return { error: fallbackError };
+  }
 }
 
 function productToState(product: CatalogProduct): EditorState {
@@ -241,19 +324,18 @@ export function ProductEditor({ mode, productId }: { mode: EditorMode; productId
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
 
-    Promise.all(
-      files.map(
-        (file) =>
-          new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(String(reader.result));
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          })
-      )
-    )
-      .then((images) => patch({ media: [...state.media, ...images] }))
-      .catch(() => setMessage("Image upload failed. Try a smaller image."));
+    Promise.all(files.map((file) => compressImageFile(file)))
+      .then((images) => {
+        const nextMedia = [...state.media, ...images];
+        const inlineMediaBytes = nextMedia.reduce((sum, image) => sum + dataUrlSize(image), 0);
+        if (inlineMediaBytes > maxInlineMediaBytes) {
+          setMessage(productDataTooLargeMessage);
+          return;
+        }
+        patch({ media: nextMedia });
+        setMessage("Image uploaded and optimized.");
+      })
+      .catch((error) => setMessage(error instanceof Error ? error.message : productDataTooLargeMessage));
 
     event.target.value = "";
   }
@@ -316,7 +398,7 @@ export function ProductEditor({ mode, productId }: { mode: EditorMode; productId
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: state.sourceUrl })
       });
-      const result = (await response.json()) as {
+      const result = (await readAdminResponse(response, "Could not read that marketplace link.")) as {
         name?: string;
         imageUrl?: string;
         price?: number;
@@ -356,6 +438,12 @@ export function ProductEditor({ mode, productId }: { mode: EditorMode; productId
     }
 
     const gallery = state.media.length ? state.media : ["/product-placeholder.svg"];
+    const inlineMediaBytes = gallery.reduce((sum, image) => sum + dataUrlSize(image), 0);
+    if (inlineMediaBytes > maxInlineMediaBytes) {
+      setMessage(productDataTooLargeMessage);
+      return;
+    }
+
     const payload: Partial<CatalogProduct> = {
       name: title,
       slug: handle || slugify(title),

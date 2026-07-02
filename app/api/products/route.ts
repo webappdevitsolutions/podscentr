@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDatabaseUrlDiagnostics, prisma } from "@/lib/prisma";
-import { productCreateInput, productInclude, productUpdateInput, serializeProduct, type CatalogPayload } from "@/lib/catalog-db";
+import { productCreateInput, productInclude, productUpdateInput, serializeProduct } from "@/lib/catalog-db";
+import { productDataTooLargeMessage, productErrorMessage, readProductPayload } from "@/lib/product-api";
 
 export const runtime = "nodejs";
 
@@ -26,7 +27,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as CatalogPayload;
+    const payload = await readProductPayload(request);
     const createInput = productCreateInput(payload);
     const existing = await prisma.product.findUnique({
       where: { slug: createInput.slug },
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
     return NextResponse.json(serializeProduct(product), { status: existing ? 200 : 201 });
   } catch (error) {
     console.error("Product create failed", error);
-    return NextResponse.json({ error: "Could not save product." }, { status: 400 });
+    const message = productErrorMessage(error, "Could not save product.");
+    return NextResponse.json({ error: message }, { status: message === productDataTooLargeMessage ? 413 : 400 });
   }
 }

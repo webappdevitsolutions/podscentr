@@ -59,10 +59,33 @@ type CatalogContextValue = {
 
 const CatalogContext = createContext<CatalogContextValue | null>(null);
 
+const largeProductPayloadMessage = "Product data is too large. Please reduce image size or use an image URL.";
+
+async function readCatalogResponse(response: Response, fallbackError: string) {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    console.error("Catalog API returned non-JSON response", {
+      status: response.status,
+      body: text.slice(0, 160)
+    });
+
+    if (response.status === 413 || text.toLowerCase().startsWith("request entity too large") || text.toLowerCase().includes("request entity")) {
+      return { error: largeProductPayloadMessage };
+    }
+
+    return { error: fallbackError };
+  }
+}
+
 async function parseProductResponse(response: Response) {
-  const result = await response.json();
+  const result = (await readCatalogResponse(response, "Catalog request failed.")) as CatalogProduct | { error?: string };
   if (!response.ok) {
-    throw new Error(result?.error || "Catalog request failed.");
+    const error = result && typeof result === "object" && "error" in result ? result.error : "";
+    throw new Error(error || "Catalog request failed.");
   }
   return result as CatalogProduct;
 }
@@ -78,7 +101,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const response = await fetch("/api/products", { cache: "no-store" });
-      const result = (await response.json()) as CatalogProduct[] | { error?: string };
+      const result = (await readCatalogResponse(response, "Could not load products.")) as CatalogProduct[] | { error?: string };
       if (!response.ok || !Array.isArray(result)) {
         throw new Error(!Array.isArray(result) ? result.error : "Could not load products.");
       }
@@ -122,7 +145,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const deleteProduct = useCallback(async (id: string) => {
     const response = await fetch(`/api/products/${id}`, { method: "DELETE" });
     if (!response.ok) {
-      const result = await response.json().catch(() => ({ error: "Could not delete product." }));
+      const result = (await readCatalogResponse(response, "Could not delete product.")) as { error?: string };
       throw new Error(result.error || "Could not delete product.");
     }
     setProducts((current) => current.filter((product) => product.id !== id));
