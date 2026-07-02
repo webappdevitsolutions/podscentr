@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { LinkButton } from "@/components/Button";
 import { type SerializedOrder } from "@/lib/checkout-db";
+import { resetAnalyticsCartId, trackAnalyticsEvent } from "@/lib/analytics-client";
 import { trackMetaEvent } from "@/lib/meta-client";
 import { formatCurrency } from "@/lib/utils";
 
@@ -94,6 +95,13 @@ function OrderSuccessContent() {
         }
       }
     );
+    void trackAnalyticsEvent("purchase_completed", {
+      orderId: order.id,
+      value: order.finalAmount,
+      numItems: order.items.reduce((sum, item) => sum + item.quantity, 0)
+    }).finally(() => {
+      resetAnalyticsCartId();
+    });
   }, [order]);
 
   if (isLoading) {

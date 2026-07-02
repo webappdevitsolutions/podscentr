@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Minus, Plus, Ruler, ShieldCheck, Star, Truck } 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Product } from "@/data/products";
 import { useCart } from "@/hooks/useCart";
+import { trackAnalyticsEvent } from "@/lib/analytics-client";
 import { trackMetaEvent } from "@/lib/meta-client";
 import { formatCurrency } from "@/lib/utils";
 
@@ -185,6 +186,10 @@ export function ProductDetails({ product }: { product: Product }) {
       content_type: "product",
       value: product.price,
       currency: "INR"
+    });
+    void trackAnalyticsEvent("product_view", {
+      productId: product.id,
+      value: product.price
     });
   }, [product.id, product.price]);
 

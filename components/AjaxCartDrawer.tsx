@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { useEffect } from "react";
 import { useCart } from "@/hooks/useCart";
+import { trackAnalyticsEvent } from "@/lib/analytics-client";
 import { formatCurrency } from "@/lib/utils";
 
 export function AjaxCartDrawer() {
@@ -27,6 +28,15 @@ export function AjaxCartDrawer() {
       document.body.style.overflow = originalOverflow;
     };
   }, [isDrawerOpen]);
+
+  useEffect(() => {
+    if (!isDrawerOpen || !isReady || !items.length) return;
+
+    void trackAnalyticsEvent("cart_view", {
+      value: subtotal,
+      numItems: itemCount
+    });
+  }, [isDrawerOpen, isReady, itemCount, items.length, subtotal]);
 
   return (
     <div className={`fixed inset-0 z-50 ${isDrawerOpen ? "" : "pointer-events-none"}`} aria-hidden={!isDrawerOpen}>

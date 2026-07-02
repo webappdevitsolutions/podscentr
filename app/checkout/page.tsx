@@ -6,6 +6,7 @@ import { PackageCheck, Smartphone, Truck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LinkButton } from "@/components/Button";
 import { useCart } from "@/hooks/useCart";
+import { syncAbandonedCheckout, toAnalyticsItems, trackAnalyticsEvent } from "@/lib/analytics-client";
 import { trackMetaEvent } from "@/lib/meta-client";
 import { deliveryChargeTable, deliveryMethodDetails, type DeliveryMethodId, type PaymentMethod } from "@/lib/orders";
 import { formatCurrency } from "@/lib/utils";
@@ -186,6 +187,18 @@ export default function CheckoutPage() {
       discount
     }),
     [address, deliveryMethod, discount, items, paymentMethod, tax]
+  );
+  const analyticsCheckout = useMemo(
+    () => ({
+      customerName: address.fullName,
+      customerEmail: address.email,
+      customerPhone: address.phone,
+      items: toAnalyticsItems(items),
+      subtotal,
+      deliveryCharge,
+      grandTotal: total
+    }),
+    [address.email, address.fullName, address.phone, deliveryCharge, items, subtotal, total]
   );
 
   function markAllAddressTouched() {
@@ -368,6 +381,11 @@ export default function CheckoutPage() {
         return;
       }
 
+      void trackAnalyticsEvent("payment_started", {
+        value: total,
+        numItems: itemCount,
+        checkout: analyticsCheckout
+      });
       const razorpayOrder = await createRazorpayOrder();
       pendingOnlineOrderId = razorpayOrder.orderId;
       setIsOrderCreating(false);
@@ -440,7 +458,22 @@ export default function CheckoutPage() {
       currency: "INR",
       num_items: itemCount
     });
-  }, [contentIds, isReady, itemCount, items.length, total]);
+    void trackAnalyticsEvent("checkout_started", {
+      value: total,
+      numItems: itemCount,
+      checkout: analyticsCheckout
+    });
+  }, [analyticsCheckout, contentIds, isReady, itemCount, items.length, total]);
+
+  useEffect(() => {
+    if (!isReady || !items.length) return;
+
+    const timer = window.setTimeout(() => {
+      void syncAbandonedCheckout(analyticsCheckout);
+    }, 600);
+
+    return () => window.clearTimeout(timer);
+  }, [analyticsCheckout, isReady, items.length]);
 
   function setAddressField(field: keyof ShippingAddress, value: string) {
     setAddress((current) => ({ ...current, [field]: value }));

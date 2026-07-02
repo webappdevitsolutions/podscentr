@@ -4,6 +4,7 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ProductCard } from "@/components/ProductCard";
 import { useCatalog } from "@/hooks/useCatalog";
+import { trackAnalyticsEvent } from "@/lib/analytics-client";
 import { trackMetaEvent } from "@/lib/meta-client";
 
 export default function ShopPage() {
@@ -28,6 +29,9 @@ export default function ShopPage() {
     void trackMetaEvent("Search", {
       search_string: searchString,
       currency: "INR"
+    });
+    void trackAnalyticsEvent("search", {
+      searchString
     });
   }
 

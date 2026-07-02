@@ -18,6 +18,7 @@ import {
   Package,
   Settings,
   ShoppingBag,
+  ShoppingCart,
   Smartphone,
   Store,
   Users,
@@ -47,6 +48,7 @@ const primaryItems: NavItem[] = [
   { label: "Customers", href: "/admin/customers", Icon: Users },
   { label: "Content", href: "/admin/content", Icon: FileText },
   { label: "Analytics", href: "/admin/analytics", Icon: BarChart3 },
+  { label: "Abandoned Checkouts", href: "/admin/abandoned-checkouts", Icon: ShoppingCart },
   { label: "Marketing", href: "/admin/marketing", Icon: Megaphone },
   { label: "Discounts", href: "/admin/discounts", Icon: BadgePercent }
 ];
@@ -134,6 +136,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   function logout() {
+    void fetch("/api/admin/logout", { method: "POST" });
     localStorage.removeItem(sessionKey);
     setIsLoggedIn(false);
     router.push("/admin");

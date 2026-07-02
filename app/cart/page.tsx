@@ -4,6 +4,7 @@ import Link from "next/link";
 import { LockKeyhole, Minus, Plus, ShieldCheck, ShoppingBag, Trash2, Truck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useCart } from "@/hooks/useCart";
+import { trackAnalyticsEvent } from "@/lib/analytics-client";
 import { deliveryChargeTable } from "@/lib/orders";
 import { formatCurrency } from "@/lib/utils";
 
@@ -45,6 +46,15 @@ export default function CartPage() {
     sessionStorage.removeItem("podscentra-cart-message");
     notify(message);
   }, [notify]);
+
+  useEffect(() => {
+    if (!items.length) return;
+
+    void trackAnalyticsEvent("cart_view", {
+      value: subtotal,
+      numItems: itemCount
+    });
+  }, [itemCount, items.length, subtotal]);
 
   function applyPromo() {
     if (!promoCode.trim()) {

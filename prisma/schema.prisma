@@ -41,6 +41,13 @@ enum PaymentStatus {
   Refunded
 }
 
+enum AbandonedCheckoutStatus {
+  STARTED
+  ABANDONED
+  RECOVERED
+  CONVERTED
+}
+
 model Product {
   id                  String           @id @default(cuid())
   slug                String           @unique
@@ -202,4 +209,54 @@ model Payment {
   rawStatus        String        @default("")
   paidAt           DateTime?
   createdAt        DateTime      @default(now())
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  sessionId String
+  type      String
+  path      String   @default("")
+  referrer  String   @default("")
+  source    String   @default("")
+  medium    String   @default("")
+  campaign  String   @default("")
+  productId String?
+  cartId    String?
+  orderId   String?
+  userAgent String   @default("")
+  device    String   @default("unknown")
+  browser   String   @default("unknown")
+  os        String   @default("unknown")
+  country   String   @default("")
+  region    String   @default("")
+  ipHash    String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([sessionId])
+  @@index([productId])
+  @@index([orderId])
+  @@index([path])
+}
+
+model AbandonedCheckout {
+  id                String                    @id @default(cuid())
+  sessionId         String
+  cartId            String
+  customerEmail     String                    @default("")
+  customerPhone     String                    @default("")
+  customerName      String                    @default("")
+  items             Json
+  subtotal          Float                     @default(0)
+  deliveryCharge    Float                     @default(0)
+  grandTotal        Float                     @default(0)
+  status            AbandonedCheckoutStatus   @default(STARTED)
+  checkoutStartedAt DateTime                  @default(now())
+  lastActivityAt    DateTime                  @updatedAt
+  convertedOrderId  String?
+  createdAt         DateTime                  @default(now())
+
+  @@unique([sessionId, cartId])
+  @@index([status, lastActivityAt])
+  @@index([convertedOrderId])
 }

@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { type Product } from "@/data/products";
 import { useCatalog } from "@/hooks/useCatalog";
+import { trackAnalyticsEvent } from "@/lib/analytics-client";
 import { trackMetaEvent } from "@/lib/meta-client";
 
 export type CartItem = {
@@ -131,6 +132,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           content_type: "product",
           value: product.price * quantity,
           currency: "INR"
+        });
+        void trackAnalyticsEvent("add_to_cart", {
+          productId: product.id,
+          value: product.price * quantity,
+          numItems: quantity
         });
         if (options?.openDrawer !== false) {
           openCartDrawer();
