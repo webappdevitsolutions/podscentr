@@ -1,7 +1,7 @@
 import { type CartItem } from "@/hooks/useCart";
 
 export type PaymentMethod = "Online Payment" | "Cash on Delivery";
-export type DeliveryMethodId = "standard" | "express";
+export type DeliveryMethodId = "standard";
 
 export type SavedOrder = {
   id: string;
@@ -15,7 +15,7 @@ export type SavedOrder = {
   paymentStatus: string;
   gatewayOrderId: string;
   gatewayPaymentId: string;
-  deliveryMethod: "Standard Delivery" | "Express Delivery";
+  deliveryMethod: "Standard Delivery";
   deliveryTime: string;
   deliveryCharge: number;
   subtotal: number;
@@ -37,12 +37,8 @@ export type SavedOrder = {
 
 export const deliveryChargeTable: Record<DeliveryMethodId, Record<PaymentMethod, number>> = {
   standard: {
-    "Online Payment": 49,
-    "Cash on Delivery": 100
-  },
-  express: {
-    "Online Payment": 99,
-    "Cash on Delivery": 150
+    "Online Payment": 0,
+    "Cash on Delivery": 49
   }
 };
 
@@ -50,10 +46,6 @@ export const deliveryMethodDetails: Record<DeliveryMethodId, { title: SavedOrder
   standard: {
     title: "Standard Delivery",
     time: "3-5 Business Days"
-  },
-  express: {
-    title: "Express Delivery",
-    time: "1-2 Business Days"
   }
 };
 

@@ -10,14 +10,14 @@ export default function ShippingPolicyPage() {
         {
           title: "Delivery Timelines",
           body: [
-            "Standard Delivery usually takes 3-5 business days after dispatch. Express Delivery usually takes 1-2 business days after dispatch, subject to courier serviceability and product availability.",
+            "Standard Delivery usually takes 3-5 business days after dispatch, subject to courier serviceability and product availability.",
             "Orders are generally processed on business days. Delivery timelines may vary for remote locations, public holidays, weather disruptions, strikes, high-volume sale periods, or courier network delays."
           ]
         },
         {
           title: "Delivery Charges",
           body: [
-            "For Online Payment orders, Standard Delivery is Rs. 49 and Express Delivery is Rs. 99. For Cash on Delivery orders, Standard Delivery is Rs. 100 and Express Delivery is Rs. 150.",
+            "For Online Payment orders, Standard Delivery is free. For Cash on Delivery orders, Standard Delivery is Rs. 49.",
             "The final delivery charge is displayed at checkout before order placement and is saved with the order."
           ]
         },

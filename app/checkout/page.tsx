@@ -16,8 +16,7 @@ const paymentMethods: Array<{ Icon: typeof Smartphone; label: PaymentMethod }> =
 ];
 
 const deliveryMethods = [
-  { id: "standard", title: "Standard Delivery" },
-  { id: "express", title: "Express Delivery" }
+  { id: "standard", title: "Standard Delivery" }
 ];
 
 type RazorpayScriptStatus = "loading" | "ready" | "failed";
