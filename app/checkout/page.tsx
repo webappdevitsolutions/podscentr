@@ -103,6 +103,26 @@ function validateAddress(address: ShippingAddress) {
   return errors;
 }
 
+async function readCheckoutResponse(response: Response, fallbackError: string) {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    console.error("Checkout API returned non-JSON response", {
+      status: response.status,
+      body: text.slice(0, 160)
+    });
+
+    if (response.status === 413 || text.toLowerCase().includes("request entity")) {
+      return { error: "Checkout request was too large. Please refresh your cart and try again." };
+    }
+
+    return { error: fallbackError };
+  }
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, clearCart, isReady } = useCart();
@@ -188,13 +208,13 @@ export default function CheckoutPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(checkoutPayload)
     });
-    const result = await response.json();
+    const result = await readCheckoutResponse(response, "Could not place COD order.");
 
     if (!response.ok) {
-      throw new Error(result.error || "Could not place COD order.");
+      throw new Error(String(result.error || "Could not place COD order."));
     }
 
-    return result.order?.id as string | undefined;
+    return (result.order as { id?: string } | undefined)?.id;
   }
 
   async function createRazorpayOrder() {
@@ -203,10 +223,10 @@ export default function CheckoutPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(checkoutPayload)
     });
-    const result = await response.json();
+    const result = await readCheckoutResponse(response, "Payment could not be started. Please check your details and try again.");
 
     if (!response.ok || !result.razorpayOrderId || !result.orderId || !result.key) {
-      throw new Error(result.error || "Payment could not be started. Please check your details and try again.");
+      throw new Error(String(result.error || "Payment could not be started. Please check your details and try again."));
     }
 
     console.info("Razorpay order created", {
@@ -223,10 +243,10 @@ export default function CheckoutPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderId, ...payment })
     });
-    const result = await response.json();
+    const result = await readCheckoutResponse(response, "Payment verification failed.");
 
     if (!response.ok || !result.verified) {
-      throw new Error(result.error || "Payment verification failed.");
+      throw new Error(String(result.error || "Payment verification failed."));
     }
 
     return true;
