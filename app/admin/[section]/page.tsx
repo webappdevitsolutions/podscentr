@@ -8,6 +8,16 @@ import { useCatalog } from "@/hooks/useCatalog";
 import { type SavedOrder } from "@/lib/orders";
 import { formatCurrency } from "@/lib/utils";
 
+const orderTabs = [
+  { id: "real", label: "Real orders" },
+  { id: "all", label: "All" },
+  { id: "confirmed", label: "Confirmed" },
+  { id: "paid", label: "Paid" },
+  { id: "cod", label: "COD" },
+  { id: "pending", label: "Pending Payment" },
+  { id: "failed", label: "Failed/Cancelled" }
+];
+
 const sectionCopy: Record<string, { title: string; text: string; icon: typeof ClipboardList }> = {
   orders: { title: "Orders", text: "Orders will appear here after customers complete checkout.", icon: ClipboardList },
   collections: { title: "Collections", text: "Group products into collections once your catalog is ready.", icon: Package },
@@ -95,13 +105,13 @@ function CatalogMigrationTools() {
   );
 }
 
-function OrdersTable({ orders }: { orders: SavedOrder[] }) {
+function OrdersTable({ orders, filterLabel }: { orders: SavedOrder[]; filterLabel: string }) {
   if (!orders.length) {
     return (
       <section className="mt-6 rounded-xl border border-dashed border-black/15 bg-white p-8 text-center shadow-sm">
         <ClipboardList className="mx-auto text-neutral-400" size={36} />
-        <h2 className="mt-4 text-lg font-bold">No orders yet</h2>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-neutral-500">Orders will appear here after customers complete checkout.</p>
+        <h2 className="mt-4 text-lg font-bold">No {filterLabel.toLowerCase()} orders</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-neutral-500">Confirmed orders appear in the default view. Pending payment attempts stay separate.</p>
       </section>
     );
   }
@@ -109,7 +119,7 @@ function OrdersTable({ orders }: { orders: SavedOrder[] }) {
   return (
     <section className="mt-6 overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm">
       <div className="border-b border-black/10 p-4">
-        <h2 className="text-base font-bold">Recent orders</h2>
+        <h2 className="text-base font-bold">{filterLabel} orders</h2>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1280px] text-left text-sm">
@@ -179,24 +189,73 @@ export default function AdminSectionPage() {
   const Icon = copy.icon;
   const { products } = useCatalog();
   const [orders, setOrders] = useState<SavedOrder[]>([]);
+  const [orderFilter, setOrderFilter] = useState("real");
+  const [cleanupMessage, setCleanupMessage] = useState("");
   const inventoryValue = products.reduce((sum, product) => sum + product.stock * product.cost, 0);
+  const selectedOrderFilter = orderTabs.find((tab) => tab.id === orderFilter) || orderTabs[0];
 
   useEffect(() => {
     async function refreshOrders() {
-      const response = await fetch("/api/orders", { cache: "no-store" });
+      const response = await fetch(`/api/orders?view=${encodeURIComponent(orderFilter)}`, { cache: "no-store" });
       if (!response.ok) return;
       setOrders((await response.json()) as SavedOrder[]);
     }
 
     void refreshOrders();
-  }, []);
+  }, [orderFilter]);
+
+  async function cleanupPendingOrders() {
+    setCleanupMessage("");
+    const response = await fetch("/api/orders?cleanup=pending", { method: "DELETE" });
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setCleanupMessage(result.error || "Could not clean pending payment records.");
+      return;
+    }
+
+    setCleanupMessage(`Marked ${result.cleaned || 0} abandoned pending payment record${result.cleaned === 1 ? "" : "s"} as cancelled.`);
+    const refreshed = await fetch(`/api/orders?view=${encodeURIComponent(orderFilter)}`, { cache: "no-store" });
+    if (refreshed.ok) setOrders((await refreshed.json()) as SavedOrder[]);
+  }
 
   return (
     <AdminShell>
       <div className="mx-auto max-w-6xl px-4 py-8 lg:px-8">
         <p className="text-sm font-semibold text-neutral-500">Admin</p>
         <h1 className="text-2xl font-bold tracking-tight">{copy.title}</h1>
-        {section === "orders" ? <OrdersTable orders={orders} /> : null}
+        {section === "orders" ? (
+          <>
+            <div className="mt-6 flex flex-col gap-3 rounded-xl border border-black/10 bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap gap-2">
+                {orderTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setOrderFilter(tab.id)}
+                    className={`rounded-lg px-3 py-2 text-sm font-bold transition ${
+                      orderFilter === tab.id ? "bg-neutral-950 text-white" : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-neutral-500">Default view shows only confirmed, paid, and COD orders.</p>
+                <button
+                  type="button"
+                  onClick={cleanupPendingOrders}
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg border border-black/10 px-4 text-sm font-bold hover:bg-neutral-50"
+                >
+                  Clean old pending payments
+                </button>
+              </div>
+              {cleanupMessage ? <p className="rounded-lg bg-neutral-50 px-4 py-3 text-sm font-semibold text-neutral-700">{cleanupMessage}</p> : null}
+            </div>
+            <OrdersTable orders={orders} filterLabel={selectedOrderFilter.label} />
+          </>
+        ) : null}
         {section === "settings" ? <CatalogMigrationTools /> : null}
         {section !== "orders" && section !== "settings" ? (
         <section className="mt-6 rounded-xl border border-black/10 bg-white p-8 text-center shadow-sm">

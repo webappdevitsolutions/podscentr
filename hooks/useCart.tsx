@@ -14,16 +14,24 @@ export type CartItem = {
 };
 
 type Toast = { id: number; message: string };
+type AddItemOptions = Partial<CartItem> & {
+  openDrawer?: boolean;
+};
 
 type CartContextValue = {
   items: CartItem[];
   toast: Toast | null;
   isReady: boolean;
-  addItem: (product: Product, options?: Partial<CartItem>) => void;
+  isDrawerOpen: boolean;
+  itemCount: number;
+  subtotal: number;
+  addItem: (product: Product, options?: AddItemOptions) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   notify: (message: string) => void;
+  openCartDrawer: () => void;
+  closeCartDrawer: () => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -37,6 +45,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [toast, setToast] = useState<Toast | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (isCatalogLoading) return;
@@ -69,12 +78,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     window.setTimeout(() => setToast((current) => (current?.id === next.id ? null : current)), 2400);
   }, []);
 
+  const openCartDrawer = useCallback(() => {
+    setIsDrawerOpen(true);
+  }, []);
+
+  const closeCartDrawer = useCallback(() => {
+    setIsDrawerOpen(false);
+  }, []);
+
+  const itemCount = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
+  const subtotal = useMemo(
+    () => items.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
+    [items]
+  );
+
   const value = useMemo<CartContextValue>(
     () => ({
       items,
       toast,
       isReady,
+      isDrawerOpen,
+      itemCount,
+      subtotal,
       notify,
+      openCartDrawer,
+      closeCartDrawer,
       addItem(product, options) {
         const quantity = options?.quantity ?? 1;
         setItems((current) => {
@@ -104,6 +132,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           value: product.price * quantity,
           currency: "INR"
         });
+        if (options?.openDrawer !== false) {
+          openCartDrawer();
+        }
         notify(`${product.name} added to cart`);
       },
       removeItem(id) {
@@ -119,7 +150,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setItems([]);
       }
     }),
-    [isReady, items, notify, toast]
+    [closeCartDrawer, isDrawerOpen, isReady, itemCount, items, notify, openCartDrawer, subtotal, toast]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

@@ -252,6 +252,18 @@ export default function CheckoutPage() {
     return true;
   }
 
+  async function cancelPendingPaymentOrder(orderId: string) {
+    if (!orderId) return;
+
+    await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "cancel-pending-payment" })
+    }).catch((error) => {
+      console.error("Could not mark pending payment order cancelled", error);
+    });
+  }
+
   async function waitForRazorpaySdk() {
     if (window.Razorpay) {
       setRazorpayScriptStatus("ready");
@@ -329,6 +341,7 @@ export default function CheckoutPage() {
 
     activePaymentRequest.current = true;
     setIsOrderCreating(true);
+    let pendingOnlineOrderId = "";
     try {
       void trackMetaEvent(
         "AddPaymentInfo",
@@ -357,19 +370,25 @@ export default function CheckoutPage() {
       }
 
       const razorpayOrder = await createRazorpayOrder();
+      pendingOnlineOrderId = razorpayOrder.orderId;
       setIsOrderCreating(false);
       const checkoutResult = await openRazorpayCheckout(razorpayOrder);
 
       if (checkoutResult === "dismissed") {
+        activePaymentRequest.current = false;
+        await cancelPendingPaymentOrder(razorpayOrder.orderId);
         setPaymentError("Payment window closed. Your cart is still saved.");
         return;
       }
 
+      pendingOnlineOrderId = "";
       redirectedForEmptyCart.current = true;
       clearCart();
       router.push(`/order-success?orderId=${encodeURIComponent(razorpayOrder.orderId)}`);
     } catch (error) {
       console.error("Checkout error:", error);
+      activePaymentRequest.current = false;
+      await cancelPendingPaymentOrder(pendingOnlineOrderId);
       setPaymentError(error instanceof Error ? error.message : "Something went wrong. Please try again.");
     } finally {
       activePaymentRequest.current = false;

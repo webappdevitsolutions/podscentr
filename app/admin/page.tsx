@@ -5,7 +5,7 @@ import { AlertTriangle, Boxes, ClipboardList, CreditCard, PackagePlus, ShoppingB
 import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { useCatalog } from "@/hooks/useCatalog";
-import { type SavedOrder } from "@/lib/orders";
+import { isRealOrder, type SavedOrder } from "@/lib/orders";
 import { formatCurrency } from "@/lib/utils";
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint: string }) {
@@ -35,7 +35,10 @@ export default function AdminDashboardPage() {
   const draftProducts = products.filter((product) => product.status === "Draft").length;
   const inventoryValue = products.reduce((sum, product) => sum + product.stock * product.cost, 0);
   const lowStock = products.filter((product) => product.trackQuantity && product.stock <= product.reorderLevel).length;
-  const paymentTotal = orders.reduce((sum, order) => sum + order.finalAmount, 0);
+  const realOrders = orders.filter(isRealOrder);
+  const paidOnlineTotal = realOrders
+    .filter((order) => order.paymentMethod === "ONLINE" && order.paymentStatus === "Paid")
+    .reduce((sum, order) => sum + order.finalAmount, 0);
 
   useEffect(() => {
     async function refreshOrders() {
@@ -63,8 +66,8 @@ export default function AdminDashboardPage() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Products" value={String(products.length)} hint={`${activeProducts} active, ${draftProducts} draft`} />
           <StatCard label="Inventory value" value={formatCurrency(inventoryValue)} hint={`${lowStock} low-stock items`} />
-          <StatCard label="Orders" value={String(orders.length)} hint={orders.length ? "Saved checkout orders" : "No orders yet"} />
-          <StatCard label="Payments" value={formatCurrency(paymentTotal)} hint={paymentTotal ? "Grand total collected" : "No payments yet"} />
+          <StatCard label="Orders" value={String(realOrders.length)} hint={realOrders.length ? "Confirmed orders only" : "No orders yet"} />
+          <StatCard label="Payments" value={formatCurrency(paidOnlineTotal)} hint={paidOnlineTotal ? "Paid online payments" : "No paid online payments yet"} />
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_360px]">
@@ -94,14 +97,14 @@ export default function AdminDashboardPage() {
           </section>
 
           <div className="space-y-4">
-            {orders.length ? (
+            {realOrders.length ? (
               <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <h2 className="font-bold">Recent orders</h2>
                   <Link href="/admin/orders" className="text-sm font-bold text-blue-700">View all</Link>
                 </div>
                 <div className="mt-3 divide-y divide-black/10">
-                  {orders.slice(0, 4).map((order) => (
+                  {realOrders.slice(0, 4).map((order) => (
                     <div key={order.id} className="py-3">
                       <p className="font-semibold">{order.customerName}</p>
                       <p className="text-xs text-neutral-500">{order.paymentMethod} · {order.paymentStatus} · {formatCurrency(order.finalAmount)}</p>
@@ -112,7 +115,7 @@ export default function AdminDashboardPage() {
             ) : (
               <EmptyPanel Icon={ClipboardList} title="No orders yet" text="Orders will appear here after customers checkout." />
             )}
-            <EmptyPanel Icon={Users} title={orders.length ? "Customers active" : "No customers yet"} text={orders.length ? "Customer profiles are being created from checkout orders." : "Customer profiles will appear as orders come in."} />
+            <EmptyPanel Icon={Users} title={realOrders.length ? "Customers active" : "No customers yet"} text={realOrders.length ? "Customer profiles are being created from confirmed orders." : "Customer profiles will appear as orders come in."} />
             <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-1 text-amber-600" size={20} />

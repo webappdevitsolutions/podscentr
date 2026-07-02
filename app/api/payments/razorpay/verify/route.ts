@@ -43,6 +43,7 @@ export async function POST(request: Request) {
       await prisma.order.update({
         where: { id: orderId },
         data: {
+          status: OrderStatus.Cancelled,
           paymentStatus: "Failed",
           payment: {
             update: {
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
     const paidOrder = await prisma.order.update({
       where: { id: orderId },
       data: {
-        status: OrderStatus.Confirmed,
+        status: OrderStatus.Paid,
         paymentStatus: "Paid",
         paymentGateway: "RAZORPAY",
         payment: {

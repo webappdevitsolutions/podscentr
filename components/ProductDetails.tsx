@@ -263,7 +263,7 @@ export function ProductDetails({ product }: { product: Product }) {
 
   function buyNow() {
     if (!validateSelection()) return;
-    addItem(product, { quantity, size, color });
+    addItem(product, { quantity, size, color, openDrawer: false });
     router.push("/checkout");
   }
 

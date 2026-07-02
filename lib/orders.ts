@@ -57,6 +57,27 @@ export const deliveryMethodDetails: Record<DeliveryMethodId, { title: SavedOrder
   }
 };
 
+export const realOrderStatuses = ["Confirmed", "Paid", "COD_PENDING"] as const;
+export const pendingOrderStatuses = ["New", "Pending", "PENDING_PAYMENT"] as const;
+export const failedOrderStatuses = ["Cancelled", "Failed", "FAILED", "CANCELLED"] as const;
+
+export function isRealOrder(order: Pick<SavedOrder, "orderStatus" | "paymentStatus">) {
+  return (
+    order.paymentStatus === "Paid" ||
+    order.paymentStatus === "COD_PENDING" ||
+    order.orderStatus === "Paid" ||
+    (order.orderStatus === "Confirmed" && !["Pending", "Failed", "Cancelled"].includes(order.paymentStatus))
+  );
+}
+
+export function isPendingPaymentOrder(order: Pick<SavedOrder, "orderStatus" | "paymentStatus">) {
+  return order.orderStatus === "New" || order.paymentStatus === "Pending" || order.paymentStatus === "PENDING_PAYMENT";
+}
+
+export function isFailedOrCancelledOrder(order: Pick<SavedOrder, "orderStatus" | "paymentStatus">) {
+  return order.orderStatus === "Cancelled" || order.paymentStatus === "Failed" || order.paymentStatus === "Cancelled";
+}
+
 export function toOrderItems(items: CartItem[]): SavedOrder["items"] {
   return items.map((item) => ({
     id: item.id,

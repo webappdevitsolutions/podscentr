@@ -55,6 +55,7 @@ export async function POST(request: Request) {
       await prisma.order.update({
         where: { id: createdOrderId },
         data: {
+          status: OrderStatus.Cancelled,
           paymentStatus: "Failed",
           payment: {
             update: {

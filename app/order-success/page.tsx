@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { LinkButton } from "@/components/Button";
 import { type SerializedOrder } from "@/lib/checkout-db";
 import { trackMetaEvent } from "@/lib/meta-client";
@@ -14,6 +14,15 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
       <span className="text-sm text-neutral-500 dark:text-neutral-400">{label}</span>
       <span className="text-sm font-bold text-ink dark:text-white sm:text-right">{value}</span>
     </div>
+  );
+}
+
+function isConfirmedOrder(order: SerializedOrder) {
+  return (
+    order.paymentStatus === "Paid" ||
+    order.paymentStatus === "COD_PENDING" ||
+    order.orderStatus === "Paid" ||
+    (order.orderStatus === "Confirmed" && !["Pending", "Failed", "Cancelled"].includes(order.paymentStatus))
   );
 }
 
@@ -61,7 +70,7 @@ function OrderSuccessContent() {
   }, [orderId]);
 
   useEffect(() => {
-    if (!order) return;
+    if (!order || !isConfirmedOrder(order)) return;
 
     const storageKey = `podscentra-meta-purchase-${order.id}`;
     if (sessionStorage.getItem(storageKey)) return;
@@ -103,6 +112,25 @@ function OrderSuccessContent() {
         <p className="mt-4 max-w-xl text-neutral-500 dark:text-neutral-400">{error || "Order details are unavailable."}</p>
         {orderId ? <p className="mt-3 text-sm font-bold">Order ID: {orderId}</p> : null}
         <LinkButton href="/shop" className="mt-8">Continue shopping</LinkButton>
+      </section>
+    );
+  }
+
+  if (!isConfirmedOrder(order)) {
+    return (
+      <section className="mx-auto flex min-h-[70vh] max-w-3xl flex-col items-center justify-center px-4 text-center">
+        <div className="grid h-16 w-16 place-items-center rounded-full bg-amber-50 text-amber-600">
+          <AlertCircle size={34} />
+        </div>
+        <h1 className="mt-6 text-4xl font-black">Payment not completed</h1>
+        <p className="mt-4 max-w-xl text-neutral-500 dark:text-neutral-400">
+          This order is not confirmed yet. Your cart is still saved if the payment was cancelled or failed.
+        </p>
+        <p className="mt-3 break-all text-sm font-bold">Order ID: {order.id}</p>
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <LinkButton href="/checkout">Back to checkout</LinkButton>
+          <LinkButton href="/cart" variant="ghost">View cart</LinkButton>
+        </div>
       </section>
     );
   }

@@ -13,14 +13,17 @@ const nav = [
 ];
 
 export function Navbar() {
-  const { items } = useCart();
+  const { itemCount, openCartDrawer } = useCart();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const count = items.reduce((sum, item) => sum + item.quantity, 0);
-  const cartLabel = count ? `Cart - ${count}` : "Cart";
-  const mobileLinks = [...nav, { href: "/cart", label: cartLabel }];
+  const cartLabel = itemCount ? `Cart - ${itemCount}` : "Cart";
 
   function closeMenu() {
     setIsMenuOpen(false);
+  }
+
+  function openCartFromNav() {
+    closeMenu();
+    openCartDrawer();
   }
 
   return (
@@ -49,14 +52,26 @@ export function Navbar() {
         </div>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-          <Link
-            href="/cart"
-            className="focus-ring hidden h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-bold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent hover:shadow-luxury dark:bg-white dark:text-ink dark:hover:bg-accent dark:hover:text-white sm:inline-flex sm:px-5"
-            aria-label={count ? `Open cart page, ${count} items` : "Open cart page"}
+          <button
+            type="button"
+            onClick={openCartFromNav}
+            className="focus-ring hidden h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-bold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent hover:shadow-luxury dark:bg-white dark:text-ink dark:hover:bg-accent dark:hover:text-white md:inline-flex md:px-5"
+            aria-label={itemCount ? `Open cart drawer, ${itemCount} items` : "Open cart drawer"}
           >
             <ShoppingCart size={18} strokeWidth={1.9} />
             <span>{cartLabel}</span>
-          </Link>
+          </button>
+          <button
+            type="button"
+            onClick={openCartFromNav}
+            className="focus-ring relative inline-grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-accent dark:bg-white dark:text-ink dark:hover:bg-accent dark:hover:text-white md:hidden"
+            aria-label={itemCount ? `Open cart drawer, ${itemCount} items` : "Open cart drawer"}
+          >
+            <ShoppingCart size={19} strokeWidth={2} />
+            <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-[11px] font-black leading-none text-white ring-2 ring-white dark:ring-ink">
+              {itemCount}
+            </span>
+          </button>
           <button
             type="button"
             onClick={() => setIsMenuOpen((current) => !current)}
@@ -76,7 +91,7 @@ export function Navbar() {
           }`}
         >
           <div className="grid gap-1 p-2">
-            {mobileLinks.map((item) => (
+            {nav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -84,9 +99,16 @@ export function Navbar() {
                 className="flex min-h-12 items-center justify-between rounded-xl px-4 text-sm font-bold text-neutral-800 transition hover:bg-neutral-100 hover:text-accent dark:text-neutral-100 dark:hover:bg-white/10"
               >
                 {item.label}
-                {item.href === "/cart" ? <ShoppingCart size={17} strokeWidth={2} /> : null}
               </Link>
             ))}
+            <button
+              type="button"
+              onClick={openCartFromNav}
+              className="flex min-h-12 items-center justify-between rounded-xl px-4 text-sm font-bold text-neutral-800 transition hover:bg-neutral-100 hover:text-accent dark:text-neutral-100 dark:hover:bg-white/10"
+            >
+              {cartLabel}
+              <ShoppingCart size={17} strokeWidth={2} />
+            </button>
           </div>
         </div>
       </nav>
