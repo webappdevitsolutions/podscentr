@@ -20,6 +20,8 @@ const deliveryMethods = [
   { id: "express", title: "Express Delivery" }
 ];
 
+type RazorpayScriptStatus = "loading" | "ready" | "failed";
+
 declare global {
   interface Window {
     Razorpay?: new (options: RazorpayOptions) => {
@@ -110,9 +112,11 @@ export default function CheckoutPage() {
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethodId>("standard");
   const [address, setAddress] = useState<ShippingAddress>(initialAddress);
   const [addressTouched, setAddressTouched] = useState<Partial<Record<keyof ShippingAddress, boolean>>>({});
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
+  const [isOrderCreating, setIsOrderCreating] = useState(false);
   const [paymentError, setPaymentError] = useState("");
-  const [isRazorpayReady, setIsRazorpayReady] = useState(false);
+  const [razorpayScriptStatus, setRazorpayScriptStatus] = useState<RazorpayScriptStatus>("loading");
+  const activePaymentRequest = useRef(false);
 
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const deliveryCharge = deliveryChargeTable[deliveryMethod][paymentMethod];
@@ -121,9 +125,17 @@ export default function CheckoutPage() {
   const discount = 0;
   const total = Math.max(0, subtotal + deliveryCharge + tax - discount);
   const addressErrors = useMemo(() => validateAddress(address), [address]);
-  const canPlaceOrder = items.length > 0 && Object.keys(addressErrors).length === 0 && Boolean(paymentMethod) && !isProcessing;
+  const cartHydrating = !isReady;
+  const canPlaceOrder =
+    isReady &&
+    items.length > 0 &&
+    Object.keys(addressErrors).length === 0 &&
+    Boolean(paymentMethod) &&
+    !isPaymentProcessing &&
+    !isOrderCreating;
   const contentIds = useMemo(() => items.map((item) => item.product.id), [items]);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const isCheckoutBusy = isPaymentProcessing || isOrderCreating;
 
   const checkoutPayload = useMemo(
     () => ({
@@ -222,7 +234,7 @@ export default function CheckoutPage() {
 
   async function waitForRazorpaySdk() {
     if (window.Razorpay) {
-      setIsRazorpayReady(true);
+      setRazorpayScriptStatus("ready");
       return;
     }
 
@@ -232,7 +244,7 @@ export default function CheckoutPage() {
         attempts += 1;
         if (window.Razorpay) {
           window.clearInterval(timer);
-          setIsRazorpayReady(true);
+          setRazorpayScriptStatus("ready");
           resolve();
           return;
         }
@@ -245,6 +257,7 @@ export default function CheckoutPage() {
   }
 
   async function openRazorpayCheckout(order: { orderId: string; razorpayOrderId: string; amount: number; currency: string; key: string }) {
+    setIsPaymentProcessing(true);
     await waitForRazorpaySdk();
 
     if (!window.Razorpay) {
@@ -294,7 +307,8 @@ export default function CheckoutPage() {
 
     if (!canPlaceOrder) return;
 
-    setIsProcessing(true);
+    activePaymentRequest.current = true;
+    setIsOrderCreating(true);
     try {
       void trackMetaEvent(
         "AddPaymentInfo",
@@ -323,6 +337,7 @@ export default function CheckoutPage() {
       }
 
       const razorpayOrder = await createRazorpayOrder();
+      setIsOrderCreating(false);
       const checkoutResult = await openRazorpayCheckout(razorpayOrder);
 
       if (checkoutResult === "dismissed") {
@@ -337,17 +352,45 @@ export default function CheckoutPage() {
       console.error("Checkout error:", error);
       setPaymentError(error instanceof Error ? error.message : "Something went wrong. Please try again.");
     } finally {
-      setIsProcessing(false);
+      activePaymentRequest.current = false;
+      setIsOrderCreating(false);
+      setIsPaymentProcessing(false);
     }
   }
 
   useEffect(() => {
-    if (isProcessing) return;
+    if (isCheckoutBusy) return;
     if (!isReady || items.length > 0 || redirectedForEmptyCart.current) return;
     redirectedForEmptyCart.current = true;
     sessionStorage.setItem("podscentra-cart-message", "Your cart is empty");
     router.replace("/cart");
-  }, [isProcessing, isReady, items.length, router]);
+  }, [isCheckoutBusy, isReady, items.length, router]);
+
+  useEffect(() => {
+    activePaymentRequest.current = false;
+    setIsOrderCreating(false);
+    setIsPaymentProcessing(false);
+    setPaymentError("");
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.Razorpay) {
+      setRazorpayScriptStatus("ready");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isPaymentProcessing) return;
+
+    const timer = window.setTimeout(() => {
+      if (activePaymentRequest.current) return;
+      setIsPaymentProcessing(false);
+      setPaymentError("Payment could not be started. Please try again.");
+    }, 15000);
+
+    return () => window.clearTimeout(timer);
+  }, [isPaymentProcessing]);
 
   useEffect(() => {
     if (!isReady || !items.length || trackedInitiateCheckout.current) return;
@@ -386,7 +429,25 @@ export default function CheckoutPage() {
     return shouldShowAddressError(field) ? <p className="text-xs font-bold text-red-600">{addressErrors[field]}</p> : null;
   }
 
-  if (!isReady || items.length === 0) return null;
+  function checkoutButtonLabel() {
+    if (cartHydrating) return "Loading cart...";
+    if (isOrderCreating) return "Creating order...";
+    if (isPaymentProcessing) {
+      return razorpayScriptStatus === "loading" ? "Preparing secure payment..." : "Processing payment...";
+    }
+    return paymentMethod === "Cash on Delivery" ? "Place order" : `Pay ${formatCurrency(total)}`;
+  }
+
+  if (!isReady) {
+    return (
+      <section className="mx-auto flex min-h-[70vh] max-w-3xl flex-col items-center justify-center px-4 text-center">
+        <h1 className="text-3xl font-black">Loading cart...</h1>
+        <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">Getting your items ready for checkout.</p>
+      </section>
+    );
+  }
+
+  if (items.length === 0) return null;
 
   return (
     <section className="mx-auto grid max-w-7xl gap-8 px-4 pb-28 pt-12 sm:px-6 lg:grid-cols-[1fr_400px] lg:px-8 lg:pb-12">
@@ -510,10 +571,14 @@ export default function CheckoutPage() {
       <Script
         src="https://checkout.razorpay.com/v1/checkout.js"
         strategy="afterInteractive"
-        onLoad={() => setIsRazorpayReady(true)}
+        onLoad={() => setRazorpayScriptStatus("ready")}
         onError={(error) => {
           console.error("Razorpay SDK failed to load", error);
-          setIsRazorpayReady(false);
+          activePaymentRequest.current = false;
+          setRazorpayScriptStatus("failed");
+          setIsOrderCreating(false);
+          setIsPaymentProcessing(false);
+          setPaymentError("Payment gateway could not load. Please refresh and try again.");
         }}
       />
       <aside className="h-fit rounded-3xl bg-white p-6 shadow-luxury dark:bg-white/5">
@@ -542,7 +607,7 @@ export default function CheckoutPage() {
           onClick={handlePlaceOrder}
           className="focus-ring mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent px-5 text-sm font-bold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isProcessing ? "Processing..." : paymentMethod === "Cash on Delivery" ? "Place order" : isRazorpayReady ? `Pay ${formatCurrency(total)}` : "Loading payment..."}
+          {checkoutButtonLabel()}
         </button>
         <LinkButton href="/cart" variant="ghost" className="mt-3 w-full">Back to cart</LinkButton>
         <div className="mt-5 rounded-2xl bg-neutral-50 p-4 text-xs leading-6 text-neutral-500 dark:bg-white/5 dark:text-neutral-400">
@@ -557,7 +622,7 @@ export default function CheckoutPage() {
           onClick={handlePlaceOrder}
           className="focus-ring flex min-h-12 w-full items-center justify-center rounded-full bg-accent font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isProcessing ? "Processing..." : paymentMethod === "Cash on Delivery" ? "Place order" : isRazorpayReady ? `Pay ${formatCurrency(total)}` : "Loading payment..."}
+          {checkoutButtonLabel()}
         </button>
       </div>
     </section>
