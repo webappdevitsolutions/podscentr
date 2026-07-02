@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Minus, Plus, Ruler, ShieldCheck, Star, Truck } 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Product } from "@/data/products";
 import { useCart } from "@/hooks/useCart";
+import { trackMetaEvent } from "@/lib/meta-client";
 import { formatCurrency } from "@/lib/utils";
 
 const defaultSizes = ["XS", "S", "M", "L", "XL", "XXL"];
@@ -166,6 +167,7 @@ export function ProductDetails({ product }: { product: Product }) {
   const [color, setColor] = useState(availableColors[0]);
   const [quantity, setQuantity] = useState(1);
   const { addItem } = useCart();
+  const trackedViewContent = useRef(false);
 
   const comparePrice = product.compareAtPrice || product.oldPrice;
   const discount = getDiscount(product.price, comparePrice);
@@ -174,6 +176,17 @@ export function ProductDetails({ product }: { product: Product }) {
   const material = product.tags?.toLowerCase().includes("cotton") ? "Cotton" : "Premium cotton blend";
   const brand = product.vendor || product.supplier || "Podscentra";
   const weight = product.weight ? `${product.weight} ${product.weightUnit || "kg"}` : "Standard";
+
+  useEffect(() => {
+    if (trackedViewContent.current) return;
+    trackedViewContent.current = true;
+    void trackMetaEvent("ViewContent", {
+      content_ids: [product.id],
+      content_type: "product",
+      value: product.price,
+      currency: "INR"
+    });
+  }, [product.id, product.price]);
 
   const accordions = useMemo<AccordionItem[]>(
     () => [

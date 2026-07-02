@@ -3,6 +3,7 @@
 import { CartProvider, useCart } from "@/hooks/useCart";
 import { CatalogProvider } from "@/hooks/useCatalog";
 import { AnimatePresence, motion } from "framer-motion";
+import { MetaPageView } from "@/components/MetaPageView";
 
 function Toast() {
   const { toast } = useCart();
@@ -28,6 +29,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <CatalogProvider>
       <CartProvider>
         {children}
+        <MetaPageView />
         <Toast />
       </CartProvider>
     </CatalogProvider>

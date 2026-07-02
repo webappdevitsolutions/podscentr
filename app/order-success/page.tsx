@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { LinkButton } from "@/components/Button";
 import { type SerializedOrder } from "@/lib/checkout-db";
+import { trackMetaEvent } from "@/lib/meta-client";
 import { formatCurrency } from "@/lib/utils";
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -58,6 +59,33 @@ function OrderSuccessContent() {
       isCurrent = false;
     };
   }, [orderId]);
+
+  useEffect(() => {
+    if (!order) return;
+
+    const storageKey = `podscentra-meta-purchase-${order.id}`;
+    if (sessionStorage.getItem(storageKey)) return;
+    sessionStorage.setItem(storageKey, "1");
+
+    void trackMetaEvent(
+      "Purchase",
+      {
+        content_ids: order.items.map((item) => item.productId || item.id).filter(Boolean),
+        content_type: "product",
+        value: order.finalAmount,
+        currency: "INR",
+        num_items: order.items.reduce((sum, item) => sum + item.quantity, 0),
+        order_id: order.id
+      },
+      {
+        orderId: order.id,
+        customer: {
+          email: order.customerEmail,
+          phone: order.customerMobile
+        }
+      }
+    );
+  }, [order]);
 
   if (isLoading) {
     return (

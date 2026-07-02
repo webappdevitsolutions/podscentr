@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { type Product } from "@/data/products";
 import { useCatalog } from "@/hooks/useCatalog";
+import { trackMetaEvent } from "@/lib/meta-client";
 
 export type CartItem = {
   id: string;
@@ -75,6 +76,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       isReady,
       notify,
       addItem(product, options) {
+        const quantity = options?.quantity ?? 1;
         setItems((current) => {
           const size = options?.size ?? product.sizes[0];
           const color = options?.color ?? product.colors[0];
@@ -82,7 +84,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           const existing = current.find((item) => item.id === id);
           if (existing) {
             return current.map((item) =>
-              item.id === id ? { ...item, quantity: item.quantity + (options?.quantity ?? 1) } : item
+              item.id === id ? { ...item, quantity: item.quantity + quantity } : item
             );
           }
           return [
@@ -90,11 +92,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             {
               id,
               product,
-              quantity: options?.quantity ?? 1,
+              quantity,
               size,
               color
             }
           ];
+        });
+        void trackMetaEvent("AddToCart", {
+          content_ids: [product.id],
+          content_type: "product",
+          value: product.price * quantity,
+          currency: "INR"
         });
         notify(`${product.name} added to cart`);
       },

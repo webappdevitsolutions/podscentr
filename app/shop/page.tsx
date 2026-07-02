@@ -4,6 +4,7 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ProductCard } from "@/components/ProductCard";
 import { useCatalog } from "@/hooks/useCatalog";
+import { trackMetaEvent } from "@/lib/meta-client";
 
 export default function ShopPage() {
   const { activeProducts, categories } = useCatalog();
@@ -20,6 +21,16 @@ export default function ShopPage() {
     return next;
   }, [activeProducts, category, query, sort]);
 
+  function submitSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const searchString = query.trim();
+    if (!searchString) return;
+    void trackMetaEvent("Search", {
+      search_string: searchString,
+      currency: "INR"
+    });
+  }
+
   return (
     <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -28,10 +39,12 @@ export default function ShopPage() {
           <h1 className="mt-3 text-5xl font-black tracking-tight sm:text-7xl">Premium collection</h1>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <label className="focus-within:ring-2 focus-within:ring-accent flex min-h-12 items-center gap-2 rounded-full border border-black/10 bg-white px-4 dark:border-white/10 dark:bg-white/5">
-            <Search size={18} />
+          <form onSubmit={submitSearch} className="focus-within:ring-2 focus-within:ring-accent flex min-h-12 items-center gap-2 rounded-full border border-black/10 bg-white px-4 dark:border-white/10 dark:bg-white/5">
+            <button type="submit" aria-label="Search products">
+              <Search size={18} />
+            </button>
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search products" className="w-full bg-transparent text-sm outline-none" />
-          </label>
+          </form>
           <select value={sort} onChange={(event) => setSort(event.target.value)} className="focus-ring min-h-12 rounded-full border border-black/10 bg-white px-4 text-sm font-semibold dark:border-white/10 dark:bg-neutral-950">
             <option value="featured">Featured</option>
             <option value="low">Price: low to high</option>

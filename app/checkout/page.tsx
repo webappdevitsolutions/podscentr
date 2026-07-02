@@ -6,6 +6,7 @@ import { PackageCheck, Smartphone, Truck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LinkButton } from "@/components/Button";
 import { useCart } from "@/hooks/useCart";
+import { trackMetaEvent } from "@/lib/meta-client";
 import { deliveryChargeTable, deliveryMethodDetails, type DeliveryMethodId, type PaymentMethod } from "@/lib/orders";
 import { formatCurrency } from "@/lib/utils";
 
@@ -76,6 +77,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, clearCart, isReady } = useCart();
   const redirectedForEmptyCart = useRef(false);
+  const trackedInitiateCheckout = useRef(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Online Payment");
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethodId>("standard");
   const [address, setAddress] = useState<ShippingAddress>(initialAddress);
@@ -92,6 +94,8 @@ export default function CheckoutPage() {
   const total = Math.max(0, subtotal + deliveryCharge + tax - discount);
   const addressErrors = useMemo(() => validateAddress(address), [address]);
   const canPlaceOrder = items.length > 0 && Object.keys(addressErrors).length === 0 && Boolean(paymentMethod) && !isProcessing;
+  const contentIds = useMemo(() => items.map((item) => item.product.id), [items]);
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   const checkoutPayload = useMemo(
     () => ({
@@ -228,6 +232,24 @@ export default function CheckoutPage() {
 
     setIsProcessing(true);
     try {
+      void trackMetaEvent(
+        "AddPaymentInfo",
+        {
+          content_ids: contentIds,
+          content_type: "product",
+          value: total,
+          currency: "INR",
+          num_items: itemCount,
+          payment_method: paymentMethod
+        },
+        {
+          customer: {
+            email: address.email,
+            phone: address.phone
+          }
+        }
+      );
+
       if (paymentMethod === "Cash on Delivery") {
         const orderId = await createCodOrder();
         redirectedForEmptyCart.current = true;
@@ -286,6 +308,18 @@ export default function CheckoutPage() {
     sessionStorage.setItem("podscentra-cart-message", "Your cart is empty");
     router.replace("/cart");
   }, [isProcessing, isReady, items.length, router]);
+
+  useEffect(() => {
+    if (!isReady || !items.length || trackedInitiateCheckout.current) return;
+    trackedInitiateCheckout.current = true;
+    void trackMetaEvent("InitiateCheckout", {
+      content_ids: contentIds,
+      content_type: "product",
+      value: total,
+      currency: "INR",
+      num_items: itemCount
+    });
+  }, [contentIds, isReady, itemCount, items.length, total]);
 
   function setAddressField(field: keyof ShippingAddress, value: string) {
     setAddress((current) => ({ ...current, [field]: value }));
