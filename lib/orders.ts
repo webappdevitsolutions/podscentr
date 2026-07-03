@@ -24,6 +24,17 @@ export type SavedOrder = {
   deliveryMethod: "Standard Delivery";
   deliveryTime: string;
   deliveryCharge: number;
+  fulfillmentStatus?: string;
+  packedAt?: string | null;
+  shippedAt?: string | null;
+  outForDeliveryAt?: string | null;
+  deliveredAt?: string | null;
+  cancelledAt?: string | null;
+  refundedAt?: string | null;
+  deletedAt?: string | null;
+  trackingNumber?: string;
+  courierName?: string;
+  adminNotes?: string;
   subtotal: number;
   tax: number;
   discount: number;
@@ -36,6 +47,8 @@ export type SavedOrder = {
     name: string;
     quantity: number;
     price: number;
+    image?: string;
+    sku?: string;
     size?: string | null;
     color?: string | null;
   }>;

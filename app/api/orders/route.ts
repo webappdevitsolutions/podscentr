@@ -7,31 +7,37 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 
 function orderWhereForView(view: string): Prisma.OrderWhereInput {
+  const notDeleted = { deletedAt: null };
   switch (view) {
     case "all":
-      return {};
+      return notDeleted;
     case "paid":
       return {
+        ...notDeleted,
         OR: [{ status: OrderStatus.Paid }, { paymentStatus: "Paid" }]
       };
     case "cod":
-      return { paymentStatus: "COD_PENDING" };
+      return { ...notDeleted, paymentStatus: "COD_PENDING" };
     case "confirmed":
       return {
+        ...notDeleted,
         status: OrderStatus.Confirmed,
         paymentStatus: { notIn: ["Pending", "Failed", "Cancelled"] }
       };
     case "pending":
       return {
+        ...notDeleted,
         OR: [{ status: OrderStatus.New }, { paymentStatus: { in: ["Pending", "PENDING_PAYMENT"] } }]
       };
     case "failed":
       return {
+        ...notDeleted,
         OR: [{ status: OrderStatus.Cancelled }, { paymentStatus: { in: ["Failed", "Cancelled"] } }]
       };
     case "real":
     default:
       return {
+        ...notDeleted,
         OR: [
           { status: OrderStatus.Paid },
           { paymentStatus: "Paid" },

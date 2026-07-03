@@ -203,27 +203,29 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       ) : null}
-      <aside className={cn("fixed inset-y-0 left-0 z-30 hidden w-64 border-r px-2 py-4 lg:block", darkMode ? "border-white/10 bg-neutral-900 text-white" : "border-black/10 bg-[#ececec]")}>
+      <aside className={cn("fixed inset-y-0 left-0 z-30 hidden w-64 border-r px-2 py-4 lg:flex lg:flex-col", darkMode ? "border-white/10 bg-neutral-900 text-white" : "border-black/10 bg-[#ececec]")}>
         <div className="mb-3 px-3">
           <img src="/img/podcentalogo.png" alt="Podscentra logo" className="h-10 w-auto max-w-[140px] object-contain" />
           <p className="text-xs text-neutral-500">Admin</p>
         </div>
-        <nav className="space-y-1">
-          {primaryItems.map((item) => (
-            <NavLink item={item} key={item.label} />
-          ))}
-        </nav>
-        <div className="mt-7 px-3 text-xs font-semibold text-neutral-500">Sales channels</div>
-        <nav className="mt-2 space-y-1">
-          {salesItems.map((item) => (
-            <NavLink item={item} key={item.label} />
-          ))}
-        </nav>
-        <div className="mt-7 px-3 text-xs font-semibold text-neutral-500">Apps</div>
-        <nav className="mt-2 space-y-1">
-          <NavLink item={{ label: "Apps", href: "/admin/apps", Icon: Blocks }} />
-        </nav>
-        <div className="absolute inset-x-2 bottom-3 space-y-1">
+        <div className="min-h-0 flex-1 overflow-y-auto pb-4 pr-1">
+          <nav className="space-y-1">
+            {primaryItems.map((item) => (
+              <NavLink item={item} key={item.label} />
+            ))}
+          </nav>
+          <div className="mt-7 px-3 text-xs font-semibold text-neutral-500">Sales channels</div>
+          <nav className="mt-2 space-y-1">
+            {salesItems.map((item) => (
+              <NavLink item={item} key={item.label} />
+            ))}
+          </nav>
+          <div className="mt-7 px-3 text-xs font-semibold text-neutral-500">Apps</div>
+          <nav className="mt-2 space-y-1">
+            <NavLink item={{ label: "Apps", href: "/admin/apps", Icon: Blocks }} />
+          </nav>
+        </div>
+        <div className="border-t border-black/10 pt-2">
           <NavLink item={{ label: "Settings", href: "/admin/settings", Icon: Settings }} />
           <button onClick={logout} className="flex min-h-8 w-full items-center gap-2 rounded-md px-3 text-sm font-medium text-neutral-700 transition hover:bg-white hover:text-neutral-950">
             <LogOut size={16} strokeWidth={2} />

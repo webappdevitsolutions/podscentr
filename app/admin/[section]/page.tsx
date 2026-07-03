@@ -24,7 +24,7 @@ const sectionCopy: Record<string, { title: string; text: string; icon: LucideIco
   orders: { title: "Orders", text: "Orders will appear here after customers complete checkout.", icon: ClipboardList },
   collections: { title: "Collections", text: "Group products into collections once your catalog is ready.", icon: Package },
   inventory: { title: "Inventory", text: "Track stock levels from the product editor and product table.", icon: Boxes },
-  "purchase-orders": { title: "Purchase orders", text: "Purchase orders will appear here when supplier buying is connected.", icon: ClipboardList },
+  "purchase-orders": { title: "Purchase orders", text: "Purchase orders are for supplier buying and stock replenishment.", icon: ClipboardList },
   transfers: { title: "Transfers", text: "Inventory transfers between locations will appear here.", icon: Boxes },
   "gift-cards": { title: "Gift cards", text: "Gift card products and balances will appear here.", icon: CreditCard },
   customers: { title: "Customers", text: "Customer records will appear here after orders are placed.", icon: Users },

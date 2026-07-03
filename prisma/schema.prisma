@@ -35,6 +35,8 @@ enum OrderStatus {
   Packed
   Shipped
   Delivered
+  Refunded
+  Returned
   Cancelled
 }
 
@@ -192,6 +194,17 @@ model Order {
   deliveryMethod String      @default("")
   deliveryTime   String      @default("")
   deliveryCharge Float       @default(0)
+  fulfillmentStatus String   @default("Unfulfilled")
+  packedAt       DateTime?
+  shippedAt      DateTime?
+  outForDeliveryAt DateTime?
+  deliveredAt    DateTime?
+  cancelledAt    DateTime?
+  refundedAt     DateTime?
+  deletedAt      DateTime?
+  trackingNumber String      @default("")
+  courierName    String      @default("")
+  adminNotes     String      @default("")
   subtotal       Float       @default(0)
   tax            Float       @default(0)
   discount       Float       @default(0)

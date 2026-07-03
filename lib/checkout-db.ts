@@ -54,6 +54,17 @@ export type SerializedOrder = {
   deliveryMethod: string;
   deliveryTime: string;
   deliveryCharge: number;
+  fulfillmentStatus: string;
+  packedAt?: string | null;
+  shippedAt?: string | null;
+  outForDeliveryAt?: string | null;
+  deliveredAt?: string | null;
+  cancelledAt?: string | null;
+  refundedAt?: string | null;
+  deletedAt?: string | null;
+  trackingNumber: string;
+  courierName: string;
+  adminNotes: string;
   subtotal: number;
   tax: number;
   discount: number;
@@ -66,6 +77,8 @@ export type SerializedOrder = {
     name: string;
     quantity: number;
     price: number;
+    image?: string;
+    sku?: string;
     size?: string | null;
     color?: string | null;
   }>;
@@ -261,7 +274,17 @@ export async function createCheckoutOrder(
 }
 
 export const orderInclude = {
-  items: true,
+  items: {
+    include: {
+      product: {
+        select: {
+          image: true,
+          imageUrl: true,
+          sku: true
+        }
+      }
+    }
+  },
   payment: true,
   customer: true
 } satisfies Prisma.OrderInclude;
@@ -290,6 +313,17 @@ export function serializeOrder(order: OrderWithRelations): SerializedOrder {
     deliveryMethod: order.deliveryMethod,
     deliveryTime: order.deliveryTime,
     deliveryCharge: order.deliveryCharge,
+    fulfillmentStatus: order.fulfillmentStatus,
+    packedAt: order.packedAt?.toISOString() || null,
+    shippedAt: order.shippedAt?.toISOString() || null,
+    outForDeliveryAt: order.outForDeliveryAt?.toISOString() || null,
+    deliveredAt: order.deliveredAt?.toISOString() || null,
+    cancelledAt: order.cancelledAt?.toISOString() || null,
+    refundedAt: order.refundedAt?.toISOString() || null,
+    deletedAt: order.deletedAt?.toISOString() || null,
+    trackingNumber: order.trackingNumber,
+    courierName: order.courierName,
+    adminNotes: order.adminNotes,
     subtotal: order.subtotal,
     tax: order.tax,
     discount: order.discount,
@@ -302,6 +336,8 @@ export function serializeOrder(order: OrderWithRelations): SerializedOrder {
       name: item.name,
       quantity: item.quantity,
       price: item.price,
+      image: item.product?.image || item.product?.imageUrl || "/product-placeholder.svg",
+      sku: item.product?.sku || "",
       size: item.size,
       color: item.color
     }))
