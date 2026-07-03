@@ -274,24 +274,26 @@ export function ProductDetails({ product }: { product: Product }) {
 
   return (
     <>
-      <section className="mx-auto grid max-w-7xl gap-10 px-4 pb-10 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] lg:gap-14 lg:px-8 lg:pt-12">
-        <div className="grid gap-4 lg:grid-cols-[84px_1fr]">
-          <div className="order-2 flex gap-3 overflow-x-auto pb-1 lg:order-1 lg:flex-col lg:overflow-visible">
-            {gallery.map((item, index) => (
-              <button
-                key={`${item}-${index}`}
-                onClick={() => setImage(item)}
-                className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-neutral-100 ring-1 transition ${
-                  image === item ? "ring-2 ring-neutral-950 dark:ring-white" : "ring-black/10 dark:ring-white/10"
-                }`}
-                aria-label={`View product image ${index + 1}`}
-              >
-                <img src={item} alt={product.name} className="h-full w-full object-cover" />
-              </button>
-            ))}
-          </div>
-          <div className="group relative order-1 aspect-[4/5] overflow-hidden rounded-2xl bg-neutral-100 shadow-sm lg:order-2">
-            <img src={image} alt={product.name} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
+      <section className="mx-auto grid max-w-7xl gap-10 overflow-hidden px-4 pb-10 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] lg:gap-14 lg:px-8 lg:pt-12">
+        <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+          <div className="grid min-w-0 gap-4 lg:grid-cols-[84px_minmax(0,1fr)]">
+            <div className="order-2 flex max-w-full gap-3 overflow-x-auto pb-1 lg:order-1 lg:max-h-[min(680px,calc(100vh-7rem))] lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0 lg:pr-1">
+              {gallery.map((item, index) => (
+                <button
+                  key={`${item}-${index}`}
+                  onClick={() => setImage(item)}
+                  className={`focus-ring relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border bg-neutral-50 ring-1 transition dark:bg-white/5 ${
+                    image === item ? "border-neutral-950 ring-2 ring-neutral-950 dark:border-white dark:ring-white" : "border-black/10 ring-black/10 hover:border-neutral-400 dark:border-white/10 dark:ring-white/10"
+                  }`}
+                  aria-label={`View product image ${index + 1}`}
+                >
+                  <img src={item} alt={product.name} className="h-full w-full object-contain p-1" />
+                </button>
+              ))}
+            </div>
+            <div className="group relative order-1 grid aspect-[4/5] min-h-[320px] max-h-[760px] min-w-0 place-items-center overflow-hidden rounded-2xl border border-black/5 bg-neutral-50 shadow-sm dark:border-white/10 dark:bg-white lg:order-2 lg:h-[min(760px,calc(100vh-7rem))]">
+              <img src={image} alt={product.name} className="h-full w-full object-contain p-3 transition duration-500 sm:p-5" />
+            </div>
           </div>
         </div>
 
