@@ -9,6 +9,9 @@ export type CollectionPayload = {
   image?: string;
   status?: "Active" | "Draft";
   showInNavbar?: boolean;
+  featured?: boolean;
+  isAutomatic?: boolean;
+  rules?: Prisma.InputJsonValue;
   sortOrder?: number;
 };
 
@@ -27,6 +30,9 @@ export function serializeCollection(collection: CollectionWithCount) {
     image: collection.image,
     status: collection.status,
     showInNavbar: collection.showInNavbar,
+    featured: collection.featured,
+    isAutomatic: collection.isAutomatic,
+    rules: collection.rules,
     sortOrder: collection.sortOrder,
     productCount: collection._count.products,
     createdAt: collection.createdAt.toISOString(),
@@ -56,6 +62,9 @@ export async function collectionCreateInput(payload: CollectionPayload): Promise
     image: payload.image || "",
     status: payload.status === "Active" ? CollectionStatus.Active : CollectionStatus.Draft,
     showInNavbar: Boolean(payload.showInNavbar),
+    featured: Boolean(payload.featured),
+    isAutomatic: Boolean(payload.isAutomatic),
+    rules: payload.rules || {},
     sortOrder: Number(payload.sortOrder || 0)
   };
 }
@@ -69,6 +78,9 @@ export async function collectionUpdateInput(payload: CollectionPayload, id: stri
   if ("image" in payload) data.image = payload.image || "";
   if ("status" in payload) data.status = payload.status === "Active" ? CollectionStatus.Active : CollectionStatus.Draft;
   if ("showInNavbar" in payload) data.showInNavbar = Boolean(payload.showInNavbar);
+  if ("featured" in payload) data.featured = Boolean(payload.featured);
+  if ("isAutomatic" in payload) data.isAutomatic = Boolean(payload.isAutomatic);
+  if ("rules" in payload) data.rules = payload.rules || {};
   if ("sortOrder" in payload) data.sortOrder = Number(payload.sortOrder || 0);
 
   return data;

@@ -118,6 +118,9 @@ model Collection {
   image        String           @default("")
   status       CollectionStatus @default(Draft)
   showInNavbar Boolean          @default(false)
+  featured     Boolean          @default(false)
+  isAutomatic  Boolean          @default(false)
+  rules        Json             @default("{}")
   sortOrder    Int              @default(0)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
@@ -245,6 +248,7 @@ model AnalyticsEvent {
   productId String?
   cartId    String?
   orderId   String?
+  collectionId String?
   userAgent String   @default("")
   device    String   @default("unknown")
   browser   String   @default("unknown")
@@ -257,6 +261,7 @@ model AnalyticsEvent {
   @@index([type, createdAt])
   @@index([sessionId])
   @@index([productId])
+  @@index([collectionId])
   @@index([orderId])
   @@index([path])
 }

@@ -1,73 +1,122 @@
-"use client";
-
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { ProductCard } from "@/components/ProductCard";
-import { useCatalog } from "@/hooks/useCatalog";
-import { useCollections } from "@/hooks/useCollections";
+import { notFound } from "next/navigation";
+import { CollectionStatus, ProductStatus } from "@/lib/generated/prisma/client";
+import { CollectionProductBrowser } from "@/components/CollectionProductBrowser";
+import { productInclude, serializeProduct } from "@/lib/catalog-db";
+import { parseCollectionRule, productMatchesCollectionRule } from "@/lib/collection-rules";
+import { prisma } from "@/lib/prisma";
 
-export default function CollectionPage() {
-  const params = useParams<{ slug: string }>();
-  const { activeProducts, isLoading: productsLoading } = useCatalog();
-  const { activeCollections, isLoading: collectionsLoading } = useCollections();
-  const collection = activeCollections.find((item) => item.slug === params.slug);
-  const products = activeProducts.filter((product) => product.collectionList?.some((item) => item.slug === params.slug));
-  const isLoading = productsLoading || collectionsLoading;
+const siteUrl = "https://podscentr.vercel.app";
 
-  if (isLoading) {
-    return (
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="rounded-3xl bg-white p-10 text-center text-sm font-semibold text-neutral-500 shadow-sm dark:bg-white/5">
-          Loading collection...
-        </div>
-      </section>
-    );
-  }
+async function getCollection(slug: string) {
+  return prisma.collection.findFirst({
+    where: { slug, status: CollectionStatus.Active },
+    include: {
+      products: {
+        where: { status: ProductStatus.Active },
+        include: productInclude,
+        orderBy: { createdAt: "desc" }
+      }
+    }
+  });
+}
 
-  if (!collection) {
-    return (
-      <section className="mx-auto max-w-7xl px-4 py-16 text-center sm:px-6 lg:px-8">
-        <h1 className="text-4xl font-black tracking-tight">Collection not found</h1>
-        <p className="mx-auto mt-3 max-w-lg text-neutral-500 dark:text-neutral-400">This collection is not published yet or may have been removed.</p>
-        <Link href="/shop" className="focus-ring mt-8 inline-flex min-h-11 items-center rounded-full bg-ink px-6 text-sm font-bold text-white hover:bg-accent dark:bg-white dark:text-ink">
-          Back to shop
-        </Link>
-      </section>
-    );
-  }
+async function getCollectionProducts(collection: Awaited<ReturnType<typeof getCollection>>) {
+  if (!collection) return [];
+  const explicitProducts = collection.products.map(serializeProduct);
+
+  if (!collection.isAutomatic) return explicitProducts;
+
+  const allActiveProducts = await prisma.product.findMany({
+    where: { status: ProductStatus.Active },
+    include: productInclude,
+    orderBy: { createdAt: "desc" }
+  });
+  const rule = parseCollectionRule(collection.rules);
+  const productMap = new Map(explicitProducts.map((product) => [product.id, product]));
+  allActiveProducts.map(serializeProduct).forEach((product) => {
+    if (productMatchesCollectionRule(product, rule)) {
+      productMap.set(product.id, product);
+    }
+  });
+
+  return [...productMap.values()];
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const collection = await getCollection(slug);
+  if (!collection) return {};
+
+  const title = `${collection.name} | Podscentra`;
+  const description = collection.description || `Shop ${collection.name} at Podscentra.`;
+  const url = `${siteUrl}/collections/${collection.slug}`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      type: "website",
+      images: collection.image ? [{ url: collection.image, alt: collection.name }] : []
+    }
+  };
+}
+
+export default async function CollectionPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const collection = await getCollection(slug);
+  if (!collection) notFound();
+
+  const products = await getCollectionProducts(collection);
+  const title = `${collection.name} | Podscentra`;
+  const description = collection.description || `Shop ${collection.name} at Podscentra.`;
+  const url = `${siteUrl}/collections/${collection.slug}`;
+  const heroImage = collection.image || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1600&auto=format&fit=crop";
+  const schema = [
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: siteUrl },
+        { "@type": "ListItem", position: 2, name: "Collections", item: `${siteUrl}/collections` },
+        { "@type": "ListItem", position: 3, name: collection.name, item: url }
+      ]
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: title,
+      description,
+      url,
+      image: heroImage
+    }
+  ];
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      {collection.image ? (
-        <div className="relative mb-10 overflow-hidden rounded-3xl bg-neutral-100">
-          <img src={collection.image} alt={collection.name} className="h-64 w-full object-cover sm:h-80" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 p-6 text-white sm:p-8">
-            <p className="text-sm font-black uppercase tracking-[0.22em]">Collection</p>
-            <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-6xl">{collection.name}</h1>
-          </div>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
+      <nav className="mb-5 text-sm font-semibold text-neutral-500">
+        <Link href="/" className="hover:text-accent">Home</Link>
+        <span className="px-2">/</span>
+        <Link href="/collections" className="hover:text-accent">Collections</Link>
+        <span className="px-2">/</span>
+        <span>{collection.name}</span>
+      </nav>
+      <div className="relative mb-10 overflow-hidden rounded-3xl bg-neutral-100">
+        <img src={heroImage} alt={collection.name} className="h-72 w-full object-cover sm:h-96" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 p-6 text-white sm:p-8">
+          <p className="text-sm font-black uppercase tracking-[0.22em]">Collection</p>
+          <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-6xl">{collection.name}</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-white/80 sm:text-base">{description}</p>
         </div>
-      ) : (
-        <div className="mb-10">
-          <p className="text-sm font-black uppercase tracking-[0.22em] text-accent">Collection</p>
-          <h1 className="mt-3 text-5xl font-black tracking-tight sm:text-7xl">{collection.name}</h1>
-        </div>
-      )}
-
-      {collection.description ? <p className="mb-8 max-w-3xl text-base leading-7 text-neutral-600 dark:text-neutral-300">{collection.description}</p> : null}
-
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {products.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
       </div>
 
-      {!products.length ? (
-        <div className="rounded-3xl border border-dashed border-black/10 bg-white p-8 text-center dark:border-white/10 dark:bg-white/5">
-          <p className="text-lg font-black">No products in this collection yet.</p>
-          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Assign active products to this collection from the admin product editor.</p>
-        </div>
-      ) : null}
+      <CollectionProductBrowser collectionId={collection.id} products={products} />
     </section>
   );
 }

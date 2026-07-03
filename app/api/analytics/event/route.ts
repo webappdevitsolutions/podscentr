@@ -13,7 +13,9 @@ const allowedEvents = new Set([
   "cart_view",
   "checkout_started",
   "payment_started",
-  "purchase_completed"
+  "purchase_completed",
+  "collection_view",
+  "collection_click"
 ]);
 
 type AnalyticsRequest = {
@@ -26,6 +28,7 @@ type AnalyticsRequest = {
   medium?: string;
   campaign?: string;
   productId?: string;
+  collectionId?: string;
   orderId?: string;
   recordEvent?: boolean;
   checkout?: {
@@ -167,6 +170,7 @@ export async function POST(request: Request) {
           medium: safeString(body.medium, 120),
           campaign: safeString(body.campaign, 180),
           productId: safeString(body.productId, 160) || null,
+          collectionId: safeString(body.collectionId, 160) || null,
           cartId: safeString(body.cartId, 160) || null,
           orderId: safeString(body.orderId, 160) || null,
           userAgent: userAgent.slice(0, 1000),

@@ -12,8 +12,20 @@ export type StoreCollection = {
   image: string;
   status: CollectionStatus;
   showInNavbar: boolean;
+  featured: boolean;
+  isAutomatic: boolean;
+  rules: {
+    type?: string;
+    value?: string;
+  };
   sortOrder: number;
   productCount: number;
+  views?: number;
+  clicks?: number;
+  productsSold?: number;
+  revenue?: number;
+  conversionRate?: number;
+  topProducts?: Array<{ name: string; quantity: number; revenue: number }>;
   createdAt: string;
   updatedAt: string;
 };
@@ -61,7 +73,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
     setError("");
 
     try {
-      const response = await fetch("/api/collections", { cache: "no-store" });
+      const response = await fetch("/api/collections?analytics=1", { cache: "no-store" });
       const result = (await readCollectionResponse(response, "Could not load collections.")) as StoreCollection[] | { error?: string };
       if (!response.ok || !Array.isArray(result)) {
         throw new Error(!Array.isArray(result) ? result.error : "Could not load collections.");

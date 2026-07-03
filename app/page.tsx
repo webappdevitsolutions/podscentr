@@ -1,10 +1,11 @@
-import { CategorySection, FlashSale, Hero, InstagramGallery, Newsletter, ProductRail, Testimonials, TrustAndSocial } from "@/components/Sections";
+import { CategorySection, FeaturedCollections, FlashSale, Hero, InstagramGallery, Newsletter, ProductRail, Testimonials, TrustAndSocial } from "@/components/Sections";
 
 export default function HomePage() {
   return (
     <>
       <Hero />
       <ProductRail title="Featured products" />
+      <FeaturedCollections />
       <CategorySection />
       <FlashSale />
       <ProductRail title="Best sellers" />

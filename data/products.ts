@@ -54,6 +54,8 @@ export type Product = {
   image: string;
   gallery: string[];
   description: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type ProductVariant = {

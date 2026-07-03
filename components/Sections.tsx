@@ -10,6 +10,8 @@ import { ProductCard } from "@/components/ProductCard";
 import { LinkButton } from "@/components/Button";
 import { formatCurrency } from "@/lib/utils";
 import { useCatalog } from "@/hooks/useCatalog";
+import { useCollections } from "@/hooks/useCollections";
+import { trackAnalyticsEvent } from "@/lib/analytics-client";
 
 export function Hero() {
   const glowRef = useRef<HTMLDivElement>(null);
@@ -179,6 +181,53 @@ export function ProductRail({ title = "Featured products", items }: { title?: st
           <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Add products to the catalog to show them here.</p>
         </div>
       )}
+    </section>
+  );
+}
+
+export function FeaturedCollections() {
+  const { activeCollections } = useCollections();
+  const collections = activeCollections
+    .filter((collection) => collection.featured)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+    .slice(0, 6);
+
+  if (!collections.length) return null;
+
+  return (
+    <section className="bg-white py-14 dark:bg-black">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.22em] text-accent">Featured Collections</p>
+            <h2 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Curated storefront edits</h2>
+          </div>
+          <Link href="/collections" className="hidden items-center gap-2 font-bold text-accent sm:flex">
+            View all <ArrowRight size={18} />
+          </Link>
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {collections.map((collection) => (
+            <Link
+              key={collection.id}
+              href={`/collections/${collection.slug}`}
+              onClick={() => void trackAnalyticsEvent("collection_click", { collectionId: collection.id })}
+              className="group overflow-hidden rounded-3xl bg-neutral-100 transition hover:-translate-y-1 hover:shadow-luxury dark:bg-white/5"
+            >
+              <div className="aspect-[16/10] overflow-hidden">
+                <img src={collection.image || "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1200&auto=format&fit=crop"} alt={collection.name} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
+              </div>
+              <div className="p-6">
+                <h3 className="text-2xl font-black">{collection.name}</h3>
+                <p className="mt-1 text-sm font-semibold text-neutral-500 dark:text-neutral-400">{collection.productCount} products</p>
+                <span className="mt-5 inline-flex min-h-10 items-center rounded-full bg-ink px-4 text-sm font-black text-white transition group-hover:bg-accent dark:bg-white dark:text-ink">
+                  Shop now
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

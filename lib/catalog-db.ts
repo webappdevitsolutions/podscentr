@@ -120,7 +120,9 @@ export function serializeProduct(product: ProductWithRelations): Product {
     sizes: product.sizes.length ? product.sizes : ["Default"],
     image,
     gallery,
-    description: product.description
+    description: product.description,
+    createdAt: product.createdAt.toISOString(),
+    updatedAt: product.updatedAt.toISOString()
   };
 }
 

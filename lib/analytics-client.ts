@@ -10,7 +10,9 @@ export type AnalyticsEventType =
   | "cart_view"
   | "checkout_started"
   | "payment_started"
-  | "purchase_completed";
+  | "purchase_completed"
+  | "collection_view"
+  | "collection_click";
 
 type AnalyticsCartItem = {
   id: string;
@@ -34,6 +36,7 @@ type AnalyticsCheckout = {
 
 type AnalyticsPayload = {
   productId?: string;
+  collectionId?: string;
   orderId?: string;
   searchString?: string;
   value?: number;
