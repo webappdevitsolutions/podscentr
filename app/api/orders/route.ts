@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { OrderStatus, PaymentStatus, Prisma } from "@/lib/generated/prisma/client";
 import { createCheckoutOrder, orderInclude, serializeOrder, type CheckoutPayload } from "@/lib/checkout-db";
+import { resolveDateRange } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -47,9 +48,13 @@ function orderWhereForView(view: string): Prisma.OrderWhereInput {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const view = url.searchParams.get("view") || "real";
+  const range = resolveDateRange(url);
 
   const orders = await prisma.order.findMany({
-    where: orderWhereForView(view),
+    where: {
+      ...orderWhereForView(view),
+      createdAt: { gte: range.from, lt: range.to }
+    },
     include: orderInclude,
     orderBy: { createdAt: "desc" }
   });

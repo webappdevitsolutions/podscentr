@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AbandonedCheckoutStatus } from "@/lib/generated/prisma/client";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { resolveDateRange } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -31,10 +32,11 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const status = url.searchParams.get("status");
+  const range = resolveDateRange(url);
   const where =
     status && status !== "all"
-      ? { status: status as AbandonedCheckoutStatus }
-      : {};
+      ? { status: status as AbandonedCheckoutStatus, lastActivityAt: { gte: range.from, lt: range.to } }
+      : { lastActivityAt: { gte: range.from, lt: range.to } };
 
   const checkouts = await prisma.abandonedCheckout.findMany({
     where,

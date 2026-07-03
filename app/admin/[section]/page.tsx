@@ -1,8 +1,9 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { BarChart3, Boxes, ClipboardList, CreditCard, Download, FileText, Megaphone, Package, Settings, Store, Upload, Users } from "lucide-react";
+import { useParams, useSearchParams } from "next/navigation";
+import { BarChart3, Boxes, ClipboardList, CreditCard, Download, FileText, Megaphone, Package, Settings, Store, Upload, Users, type LucideIcon } from "lucide-react";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { AdminDateRangeSelector } from "@/components/admin/AdminDateRangeSelector";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { useCatalog } from "@/hooks/useCatalog";
 import { type SavedOrder } from "@/lib/orders";
@@ -18,7 +19,7 @@ const orderTabs = [
   { id: "failed", label: "Failed/Cancelled" }
 ];
 
-const sectionCopy: Record<string, { title: string; text: string; icon: typeof ClipboardList }> = {
+const sectionCopy: Record<string, { title: string; text: string; icon: LucideIcon }> = {
   orders: { title: "Orders", text: "Orders will appear here after customers complete checkout.", icon: ClipboardList },
   collections: { title: "Collections", text: "Group products into collections once your catalog is ready.", icon: Package },
   inventory: { title: "Inventory", text: "Track stock levels from the product editor and product table.", icon: Boxes },
@@ -155,7 +156,7 @@ function OrdersTable({ orders, filterLabel }: { orders: SavedOrder[]; filterLabe
                   <div className="grid gap-1">
                     {order.items.map((item) => (
                       <p key={item.id} className="text-xs text-neutral-600">
-                        {item.name} x {item.quantity}{item.size ? ` · ${item.size}` : ""}
+                        {item.name} x {item.quantity}{item.size ? ` - ${item.size}` : ""}
                       </p>
                     ))}
                   </div>
@@ -182,8 +183,72 @@ function OrdersTable({ orders, filterLabel }: { orders: SavedOrder[]; filterLabe
   );
 }
 
+function PaymentsTable({ orders }: { orders: SavedOrder[] }) {
+  const totalPaid = orders.reduce((sum, order) => sum + order.finalAmount, 0);
+
+  return (
+    <>
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
+          <p className="text-sm font-semibold text-neutral-500">Paid payments</p>
+          <p className="mt-2 text-2xl font-bold">{orders.length}</p>
+        </div>
+        <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
+          <p className="text-sm font-semibold text-neutral-500">Paid revenue</p>
+          <p className="mt-2 text-2xl font-bold">{formatCurrency(totalPaid)}</p>
+        </div>
+        <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
+          <p className="text-sm font-semibold text-neutral-500">Gateway</p>
+          <p className="mt-2 text-2xl font-bold">Razorpay</p>
+        </div>
+      </div>
+      <section className="mt-6 overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm">
+        <div className="border-b border-black/10 p-4">
+          <h2 className="text-base font-bold">Payments</h2>
+        </div>
+        {orders.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] text-left text-sm">
+              <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+                <tr>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Order</th>
+                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Method</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Payment ID</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/10">
+                {orders.map((order) => (
+                  <tr key={order.id} className="hover:bg-neutral-50">
+                    <td className="px-4 py-3 text-xs text-neutral-500">{new Date(order.date).toLocaleString("en-IN")}</td>
+                    <td className="px-4 py-3 font-bold">{order.id}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold">{order.customerName || "Customer"}</p>
+                      <p className="text-xs text-neutral-500">{order.customerEmail || "-"}</p>
+                    </td>
+                    <td className="px-4 py-3">{order.paymentMethod}</td>
+                    <td className="px-4 py-3 font-semibold">{order.paymentStatus}</td>
+                    <td className="max-w-[220px] px-4 py-3 text-xs text-neutral-500">{order.gatewayPaymentId || order.gatewayOrderId || "-"}</td>
+                    <td className="px-4 py-3 text-right text-base font-black">{formatCurrency(order.finalAmount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-sm text-neutral-500">No paid payments in this date range.</div>
+        )}
+      </section>
+    </>
+  );
+}
+
 export default function AdminSectionPage() {
   const params = useParams<{ section: string }>();
+  const searchParams = useSearchParams();
   const section = params.section;
   const copy = sectionCopy[section] || { title: slugToTitle(section), text: "This admin section is ready to be expanded.", icon: Package };
   const Icon = copy.icon;
@@ -191,18 +256,21 @@ export default function AdminSectionPage() {
   const [orders, setOrders] = useState<SavedOrder[]>([]);
   const [orderFilter, setOrderFilter] = useState("real");
   const [cleanupMessage, setCleanupMessage] = useState("");
+  const queryString = searchParams.toString() || "range=7d";
   const inventoryValue = products.reduce((sum, product) => sum + product.stock * product.cost, 0);
   const selectedOrderFilter = orderTabs.find((tab) => tab.id === orderFilter) || orderTabs[0];
 
   useEffect(() => {
     async function refreshOrders() {
-      const response = await fetch(`/api/orders?view=${encodeURIComponent(orderFilter)}`, { cache: "no-store" });
+      const params = new URLSearchParams(queryString);
+      params.set("view", section === "payments" ? "paid" : orderFilter);
+      const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
       if (!response.ok) return;
       setOrders((await response.json()) as SavedOrder[]);
     }
 
     void refreshOrders();
-  }, [orderFilter]);
+  }, [orderFilter, queryString, section]);
 
   async function cleanupPendingOrders() {
     setCleanupMessage("");
@@ -215,7 +283,9 @@ export default function AdminSectionPage() {
     }
 
     setCleanupMessage(`Marked ${result.cleaned || 0} abandoned pending payment record${result.cleaned === 1 ? "" : "s"} as cancelled.`);
-    const refreshed = await fetch(`/api/orders?view=${encodeURIComponent(orderFilter)}`, { cache: "no-store" });
+    const params = new URLSearchParams(queryString);
+    params.set("view", orderFilter);
+    const refreshed = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
     if (refreshed.ok) setOrders((await refreshed.json()) as SavedOrder[]);
   }
 
@@ -226,6 +296,9 @@ export default function AdminSectionPage() {
         <h1 className="text-2xl font-bold tracking-tight">{copy.title}</h1>
         {section === "orders" ? (
           <>
+            <div className="mt-5">
+              <AdminDateRangeSelector />
+            </div>
             <div className="mt-6 flex flex-col gap-3 rounded-xl border border-black/10 bg-white p-4 shadow-sm">
               <div className="flex flex-wrap gap-2">
                 {orderTabs.map((tab) => (
@@ -256,8 +329,16 @@ export default function AdminSectionPage() {
             <OrdersTable orders={orders} filterLabel={selectedOrderFilter.label} />
           </>
         ) : null}
+        {section === "payments" ? (
+          <>
+            <div className="mt-5">
+              <AdminDateRangeSelector />
+            </div>
+            <PaymentsTable orders={orders} />
+          </>
+        ) : null}
         {section === "settings" ? <CatalogMigrationTools /> : null}
-        {section !== "orders" && section !== "settings" ? (
+        {section !== "orders" && section !== "payments" && section !== "settings" ? (
         <section className="mt-6 rounded-xl border border-black/10 bg-white p-8 text-center shadow-sm">
           <Icon className="mx-auto text-neutral-400" size={36} />
           <h2 className="mt-4 text-lg font-bold">{copy.title}</h2>

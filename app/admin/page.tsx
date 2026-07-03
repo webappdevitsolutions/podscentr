@@ -1,19 +1,61 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, Boxes, ClipboardList, CreditCard, PackagePlus, ShoppingBag, Users } from "lucide-react";
+import { AlertTriangle, Boxes, ClipboardList, CreditCard, MousePointerClick, PackagePlus, ShoppingBag, TrendingUp, Users, type LucideIcon } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AdminDateRangeSelector } from "@/components/admin/AdminDateRangeSelector";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { useCatalog } from "@/hooks/useCatalog";
 import { isRealOrder, type SavedOrder } from "@/lib/orders";
 import { formatCurrency } from "@/lib/utils";
 
-function StatCard({ label, value, hint }: { label: string; value: string; hint: string }) {
+type DashboardAnalytics = {
+  summary: {
+    totalVisitors: number;
+    pageViews: number;
+    productViews: number;
+    addToCarts: number;
+    checkoutStarted: number;
+    ordersCompleted: number;
+    conversionRate: number;
+    abandonedCheckouts: number;
+    revenue: number;
+  };
+  comparison: Partial<Record<string, number>>;
+};
+
+const emptyDashboardAnalytics: DashboardAnalytics = {
+  summary: {
+    totalVisitors: 0,
+    pageViews: 0,
+    productViews: 0,
+    addToCarts: 0,
+    checkoutStarted: 0,
+    ordersCompleted: 0,
+    conversionRate: 0,
+    abandonedCheckouts: 0,
+    revenue: 0
+  },
+  comparison: {}
+};
+
+function StatCard({ label, value, hint, Icon }: { label: string; value: string; hint: string; Icon?: LucideIcon }) {
+  const CardIcon = Icon;
   return (
     <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
-      <p className="text-sm font-semibold text-neutral-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-neutral-950">{value}</p>
-      <p className="mt-1 text-sm text-neutral-500">{hint}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-neutral-500">{label}</p>
+          <p className="mt-2 text-2xl font-bold text-neutral-950">{value}</p>
+          <p className="mt-1 text-sm text-neutral-500">{hint}</p>
+        </div>
+        {CardIcon ? (
+          <div className="grid h-10 w-10 place-items-center rounded-lg bg-neutral-100 text-neutral-700">
+            <CardIcon size={19} />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -29,8 +71,11 @@ function EmptyPanel({ title, text, Icon }: { title: string; text: string; Icon: 
 }
 
 export default function AdminDashboardPage() {
+  const searchParams = useSearchParams();
   const { products } = useCatalog();
   const [orders, setOrders] = useState<SavedOrder[]>([]);
+  const [analytics, setAnalytics] = useState<DashboardAnalytics>(emptyDashboardAnalytics);
+  const queryString = searchParams.toString() || "range=7d";
   const activeProducts = products.filter((product) => product.status === "Active").length;
   const draftProducts = products.filter((product) => product.status === "Draft").length;
   const inventoryValue = products.reduce((sum, product) => sum + product.stock * product.cost, 0);
@@ -42,13 +87,29 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     async function refreshOrders() {
-      const response = await fetch("/api/orders", { cache: "no-store" });
+      const response = await fetch(`/api/orders?${queryString}`, { cache: "no-store" });
       if (!response.ok) return;
       setOrders((await response.json()) as SavedOrder[]);
     }
 
     void refreshOrders();
-  }, []);
+  }, [queryString]);
+
+  useEffect(() => {
+    async function refreshAnalytics() {
+      const response = await fetch(`/api/admin/analytics?${queryString}`, { cache: "no-store" });
+      if (!response.ok) return;
+      setAnalytics((await response.json()) as DashboardAnalytics);
+    }
+
+    void refreshAnalytics();
+  }, [queryString]);
+
+  function comparisonText(value?: number) {
+    if (typeof value !== "number") return "";
+    const sign = value > 0 ? "+" : "";
+    return `${sign}${value.toFixed(1)}% vs previous period`;
+  }
 
   return (
     <AdminShell>
@@ -62,12 +123,22 @@ export default function AdminDashboardPage() {
             <PackagePlus size={17} /> Add product
           </Link>
         </div>
+        <div className="mt-5">
+          <AdminDateRangeSelector />
+        </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Products" value={String(products.length)} hint={`${activeProducts} active, ${draftProducts} draft`} />
-          <StatCard label="Inventory value" value={formatCurrency(inventoryValue)} hint={`${lowStock} low-stock items`} />
-          <StatCard label="Orders" value={String(realOrders.length)} hint={realOrders.length ? "Confirmed orders only" : "No orders yet"} />
-          <StatCard label="Payments" value={formatCurrency(paidOnlineTotal)} hint={paidOnlineTotal ? "Paid online payments" : "No paid online payments yet"} />
+          <StatCard Icon={ShoppingBag} label="Products" value={String(products.length)} hint={`${activeProducts} active, ${draftProducts} draft`} />
+          <StatCard Icon={Boxes} label="Inventory value" value={formatCurrency(inventoryValue)} hint={`${lowStock} low-stock items`} />
+          <StatCard Icon={ClipboardList} label="Orders" value={String(realOrders.length)} hint={comparisonText(analytics.comparison.ordersCompleted) || "Confirmed orders only"} />
+          <StatCard Icon={CreditCard} label="Payments" value={formatCurrency(paidOnlineTotal)} hint={paidOnlineTotal ? "Paid online payments" : "No paid online payments yet"} />
+          <StatCard Icon={Users} label="Visitors" value={String(analytics.summary.totalVisitors)} hint={comparisonText(analytics.comparison.totalVisitors) || "Unique sessions"} />
+          <StatCard Icon={MousePointerClick} label="Product views" value={String(analytics.summary.productViews)} hint={comparisonText(analytics.comparison.productViews) || "Product detail opens"} />
+          <StatCard Icon={ShoppingBag} label="Add to carts" value={String(analytics.summary.addToCarts)} hint={comparisonText(analytics.comparison.addToCarts) || "Cart intent events"} />
+          <StatCard Icon={MousePointerClick} label="Checkouts started" value={String(analytics.summary.checkoutStarted)} hint={comparisonText(analytics.comparison.checkoutStarted) || "Checkout sessions"} />
+          <StatCard Icon={ShoppingBag} label="Abandoned checkouts" value={String(analytics.summary.abandonedCheckouts)} hint={comparisonText(analytics.comparison.abandonedCheckouts) || "Started or abandoned"} />
+          <StatCard Icon={TrendingUp} label="Revenue" value={formatCurrency(analytics.summary.revenue)} hint={comparisonText(analytics.comparison.revenue) || "Confirmed order revenue"} />
+          <StatCard Icon={TrendingUp} label="Conversion rate" value={`${analytics.summary.conversionRate.toFixed(1)}%`} hint="Orders / visitors" />
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_360px]">
@@ -83,7 +154,7 @@ export default function AdminDashboardPage() {
                     <img src={product.image} alt={product.name} className="h-12 w-12 rounded-lg object-cover" />
                     <div>
                       <p className="font-semibold">{product.name}</p>
-                      <p className="text-sm text-neutral-500">{product.category} · {product.stock} in stock</p>
+                      <p className="text-sm text-neutral-500">{product.category} - {product.stock} in stock</p>
                     </div>
                     <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-bold">{product.status}</span>
                   </Link>
@@ -107,7 +178,7 @@ export default function AdminDashboardPage() {
                   {realOrders.slice(0, 4).map((order) => (
                     <div key={order.id} className="py-3">
                       <p className="font-semibold">{order.customerName}</p>
-                      <p className="text-xs text-neutral-500">{order.paymentMethod} · {order.paymentStatus} · {formatCurrency(order.finalAmount)}</p>
+                      <p className="text-xs text-neutral-500">{order.paymentMethod} - {order.paymentStatus} - {formatCurrency(order.finalAmount)}</p>
                     </div>
                   ))}
                 </div>

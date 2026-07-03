@@ -1,7 +1,9 @@
 "use client";
 
 import { Clipboard, RefreshCw, Trash2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { AdminDateRangeSelector } from "@/components/admin/AdminDateRangeSelector";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { formatCurrency } from "@/lib/utils";
 
@@ -37,12 +39,16 @@ function itemSummary(items: CheckoutItem[]) {
 }
 
 export default function AdminAbandonedCheckoutsPage() {
+  const searchParams = useSearchParams();
   const [checkouts, setCheckouts] = useState<AbandonedCheckoutRow[]>([]);
   const [status, setStatus] = useState("all");
   const [message, setMessage] = useState("");
+  const queryString = searchParams.toString() || "range=7d";
 
   const loadCheckouts = useCallback(async (nextStatus = status) => {
-    const response = await fetch(`/api/admin/abandoned-checkouts?status=${encodeURIComponent(nextStatus)}`, { cache: "no-store" });
+    const params = new URLSearchParams(queryString);
+    params.set("status", nextStatus);
+    const response = await fetch(`/api/admin/abandoned-checkouts?${params.toString()}`, { cache: "no-store" });
     const result = await response.json().catch(() => null);
 
     if (!response.ok || !Array.isArray(result)) {
@@ -51,7 +57,7 @@ export default function AdminAbandonedCheckoutsPage() {
     }
 
     setCheckouts(result as AbandonedCheckoutRow[]);
-  }, [status]);
+  }, [queryString, status]);
 
   useEffect(() => {
     void loadCheckouts(status);
@@ -97,6 +103,9 @@ export default function AdminAbandonedCheckoutsPage() {
           <button onClick={cleanupOldStarted} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-neutral-950 px-4 text-sm font-bold text-white hover:bg-neutral-800">
             <RefreshCw size={16} /> Mark old started as abandoned
           </button>
+        </div>
+        <div className="mt-5">
+          <AdminDateRangeSelector />
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
