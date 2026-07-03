@@ -1,26 +1,32 @@
 "use client";
 
 import { Search, SlidersHorizontal } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ProductCard } from "@/components/ProductCard";
 import { useCatalog } from "@/hooks/useCatalog";
+import { useCollections } from "@/hooks/useCollections";
 import { trackAnalyticsEvent } from "@/lib/analytics-client";
 import { trackMetaEvent } from "@/lib/meta-client";
 
 export default function ShopPage() {
+  const searchParams = useSearchParams();
   const { activeProducts, categories } = useCatalog();
+  const { activeCollections } = useCollections();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
+  const [collectionSlug, setCollectionSlug] = useState(searchParams.get("collection") || "All");
   const [sort, setSort] = useState("featured");
   const filtered = useMemo(() => {
     const next = activeProducts
       .filter((product) => category === "All" || product.category === category)
+      .filter((product) => collectionSlug === "All" || product.collectionList?.some((collection) => collection.slug === collectionSlug))
       .filter((product) => product.name.toLowerCase().includes(query.toLowerCase()));
     if (sort === "low") return [...next].sort((a, b) => a.price - b.price);
     if (sort === "high") return [...next].sort((a, b) => b.price - a.price);
     if (sort === "rating") return [...next].sort((a, b) => b.rating - a.rating);
     return next;
-  }, [activeProducts, category, query, sort]);
+  }, [activeProducts, category, collectionSlug, query, sort]);
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,6 +73,23 @@ export default function ShopPage() {
           </button>
         ))}
       </div>
+      {activeCollections.length ? (
+        <div className="mt-3 flex gap-3 overflow-x-auto pb-2">
+          <span className="flex items-center rounded-full bg-neutral-200 px-4 py-2 text-sm font-bold dark:bg-white/10">Collections</span>
+          <button onClick={() => setCollectionSlug("All")} className={`focus-ring rounded-full px-4 py-2 text-sm font-bold ${collectionSlug === "All" ? "bg-accent text-white" : "bg-white dark:bg-white/5"}`}>
+            All
+          </button>
+          {activeCollections.map((collection) => (
+            <button
+              key={collection.id}
+              onClick={() => setCollectionSlug(collection.slug)}
+              className={`focus-ring rounded-full px-4 py-2 text-sm font-bold ${collectionSlug === collection.slug ? "bg-accent text-white" : "bg-white dark:bg-white/5"}`}
+            >
+              {collection.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {filtered.map((product) => (
           <ProductCard key={product.id} product={product} />

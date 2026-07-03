@@ -17,6 +17,7 @@ import {
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { type ProductVariant } from "@/data/products";
 import { useCatalog, type CatalogProduct, type Marketplace, type ProductStatus } from "@/hooks/useCatalog";
+import { useCollections } from "@/hooks/useCollections";
 import { formatCurrency } from "@/lib/utils";
 
 type EditorMode = "new" | "edit";
@@ -54,6 +55,7 @@ type EditorState = {
   productType: string;
   vendor: string;
   collections: string;
+  collectionIds: string[];
   tags: string;
   onlineStore: boolean;
   pointOfSale: boolean;
@@ -96,6 +98,7 @@ const emptyState: EditorState = {
   productType: "",
   vendor: "",
   collections: "",
+  collectionIds: [],
   tags: "",
   onlineStore: true,
   pointOfSale: false,
@@ -236,6 +239,7 @@ function productToState(product: CatalogProduct): EditorState {
     productType: product.productType,
     vendor: product.vendor || product.supplier,
     collections: product.collections,
+    collectionIds: product.collectionIds || [],
     tags: product.tags,
     onlineStore: product.onlineStore,
     pointOfSale: product.pointOfSale,
@@ -298,6 +302,7 @@ function CheckboxField({ label, checked, onChange, helper }: { label: string; ch
 export function ProductEditor({ mode, productId }: { mode: EditorMode; productId?: string }) {
   const router = useRouter();
   const { products, addProduct, updateProduct, isLoading } = useCatalog();
+  const { collections: storeCollections } = useCollections();
   const existingProduct = useMemo(() => products.find((product) => product.id === productId), [productId, products]);
   const [state, setState] = useState<EditorState>(emptyState);
   const [message, setMessage] = useState("");
@@ -380,6 +385,14 @@ export function ProductEditor({ mode, productId }: { mode: EditorMode; productId
   function updateVariant(index: number, updates: Partial<ProductVariant>) {
     patch({
       variants: state.variants.map((variant, variantIndex) => (variantIndex === index ? { ...variant, ...updates } : variant))
+    });
+  }
+
+  function toggleCollection(collectionId: string) {
+    patch({
+      collectionIds: state.collectionIds.includes(collectionId)
+        ? state.collectionIds.filter((id) => id !== collectionId)
+        : [...state.collectionIds, collectionId]
     });
   }
 
@@ -478,6 +491,7 @@ export function ProductEditor({ mode, productId }: { mode: EditorMode; productId
       supplier: state.vendor,
       vendor: state.vendor,
       collections: state.collections,
+      collectionIds: state.collectionIds,
       tags: state.tags,
       onlineStore: state.onlineStore,
       pointOfSale: state.pointOfSale,
@@ -780,7 +794,32 @@ export function ProductEditor({ mode, productId }: { mode: EditorMode; productId
               <TextField label="Category" value={state.category} onChange={(category) => patch({ category })} />
               <TextField label="Product type" value={state.productType} onChange={(productType) => patch({ productType })} />
               <TextField label="Vendor" value={state.vendor} onChange={(vendor) => patch({ vendor })} />
-              <TextField label="Collections" value={state.collections} onChange={(collections) => patch({ collections })} />
+              <div className="grid gap-2 text-sm font-medium text-neutral-700">
+                Collections
+                {storeCollections.length ? (
+                  <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-black/10 p-3">
+                    {storeCollections.map((collection) => (
+                      <label key={collection.id} className="flex items-center justify-between gap-3 text-sm font-semibold text-neutral-800">
+                        <span>{collection.name}</span>
+                        <input
+                          type="checkbox"
+                          checked={state.collectionIds.includes(collection.id)}
+                          onChange={() => toggleCollection(collection.id)}
+                          className="h-4 w-4 accent-neutral-950"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-lg bg-neutral-50 p-3 text-xs font-normal leading-5 text-neutral-500">Create collections from Admin - Collections, then assign this product.</p>
+                )}
+                <input
+                  value={state.collections}
+                  onChange={(event) => patch({ collections: event.target.value })}
+                  placeholder="Legacy collection labels"
+                  className="min-h-10 rounded-lg border border-black/20 bg-white px-3 text-sm text-neutral-950 outline-none transition focus:border-neutral-950"
+                />
+              </div>
               <TextField label="Tags" value={state.tags} onChange={(tags) => patch({ tags })} />
             </div>
           </Card>

@@ -17,7 +17,7 @@ export default function AdminProductsPage() {
   const { products, deleteProduct, setProductStatus, isLoading, error } = useCatalog();
   const [query, setQuery] = useState("");
   const filteredProducts = products.filter((product) =>
-    [product.name, product.category, product.sku, product.vendor, product.marketplace].join(" ").toLowerCase().includes(query.toLowerCase())
+    [product.name, product.category, product.sku, product.vendor, product.marketplace, product.collections].join(" ").toLowerCase().includes(query.toLowerCase())
   );
 
   return (
@@ -66,7 +66,8 @@ export default function AdminProductsPage() {
                           <img src={product.image} alt={product.name} className="h-12 w-12 rounded-lg object-cover" />
                           <span>
                             <span className="block font-semibold text-neutral-950">{product.name}</span>
-                            <span className="block text-xs text-neutral-500">{product.category} · {product.sku || "No SKU"}</span>
+                            <span className="block text-xs text-neutral-500">{product.category} - {product.sku || "No SKU"}</span>
+                            <span className="block text-xs text-neutral-500">{product.collections || "No collections"}</span>
                           </span>
                         </Link>
                       </td>

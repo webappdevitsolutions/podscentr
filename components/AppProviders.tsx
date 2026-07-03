@@ -2,6 +2,7 @@
 
 import { CartProvider, useCart } from "@/hooks/useCart";
 import { CatalogProvider } from "@/hooks/useCatalog";
+import { CollectionsProvider } from "@/hooks/useCollections";
 import { AnimatePresence, motion } from "framer-motion";
 import { AjaxCartDrawer } from "@/components/AjaxCartDrawer";
 import { MetaPageView } from "@/components/MetaPageView";
@@ -28,12 +29,14 @@ function Toast() {
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <CatalogProvider>
-      <CartProvider>
-        {children}
-        <MetaPageView />
-        <AjaxCartDrawer />
-        <Toast />
-      </CartProvider>
+      <CollectionsProvider>
+        <CartProvider>
+          {children}
+          <MetaPageView />
+          <AjaxCartDrawer />
+          <Toast />
+        </CartProvider>
+      </CollectionsProvider>
     </CatalogProvider>
   );
 }

@@ -6,7 +6,11 @@ const placeholderImage = "/product-placeholder.svg";
 const productInclude = {
   images: { orderBy: { position: "asc" as const } },
   variants: true,
-  inventory: true
+  inventory: true,
+  collectionLinks: {
+    orderBy: [{ sortOrder: "asc" as const }, { name: "asc" as const }],
+    select: { id: true, name: true, slug: true }
+  }
 };
 
 export type ProductWithRelations = Prisma.ProductGetPayload<{
@@ -18,6 +22,7 @@ export type CatalogPayload = Partial<Product> & {
   marketplace?: "Amazon" | "Flipkart" | "Meesho" | "Myntra" | "Other" | "Manual";
   gallery?: string[];
   variants?: ProductVariant[];
+  collectionIds?: string[];
 };
 
 export function slugify(value: string) {
@@ -48,6 +53,11 @@ function cleanImageList(payload: CatalogPayload) {
   return Array.from(new Set(list));
 }
 
+function cleanCollectionIds(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value.map((item) => String(item || "").trim()).filter(Boolean)));
+}
+
 export function serializeProduct(product: ProductWithRelations): Product {
   const relationImages = product.images.map((image) => image.url).filter(Boolean);
   const gallery = relationImages.length ? relationImages : [product.image || product.imageUrl || placeholderImage];
@@ -70,7 +80,9 @@ export function serializeProduct(product: ProductWithRelations): Product {
     supplier: product.supplier,
     vendor: product.vendor,
     productType: product.productType,
-    collections: product.collections,
+    collections: product.collectionLinks.length ? product.collectionLinks.map((collection) => collection.name).join(", ") : product.collections,
+    collectionIds: product.collectionLinks.map((collection) => collection.id),
+    collectionList: product.collectionLinks,
     tags: product.tags,
     marketplace: product.marketplace,
     sourceUrl: product.sourceUrl,
@@ -120,6 +132,7 @@ export function productCreateInput(payload: CatalogPayload): Prisma.ProductCreat
   const stock = Math.max(0, Number(payload.stock ?? 0));
   const reorderLevel = Math.max(0, Number(payload.reorderLevel ?? 5));
   const compareAtPrice = Number(payload.compareAtPrice ?? payload.oldPrice ?? 0) || null;
+  const collectionIds = cleanCollectionIds(payload.collectionIds);
 
   return {
     ...(payload.id ? { id: payload.id } : {}),
@@ -185,7 +198,14 @@ export function productCreateInput(payload: CatalogPayload): Prisma.ProductCreat
         quantity: stock,
         reorderLevel
       }
-    }
+    },
+    ...(collectionIds.length
+      ? {
+          collectionLinks: {
+            connect: collectionIds.map((id) => ({ id }))
+          }
+        }
+      : {})
   };
 }
 
@@ -194,6 +214,7 @@ export function productUpdateInput(payload: CatalogPayload): Prisma.ProductUpdat
   const hasMediaUpdate = "gallery" in payload || "image" in payload || "imageUrl" in payload;
   const hasVariantUpdate = "variants" in payload;
   const hasInventoryUpdate = "stock" in payload || "reorderLevel" in payload;
+  const hasCollectionUpdate = "collectionIds" in payload;
 
   const { id, images, variants, inventory, ...scalarInput } = createInput;
   void id;
@@ -232,6 +253,13 @@ export function productUpdateInput(payload: CatalogPayload): Prisma.ProductUpdat
                 reorderLevel: Number(payload.reorderLevel ?? 5)
               }
             }
+          }
+        }
+      : {}),
+    ...(hasCollectionUpdate
+      ? {
+          collectionLinks: {
+            set: cleanCollectionIds(payload.collectionIds).map((id) => ({ id }))
           }
         }
       : {})

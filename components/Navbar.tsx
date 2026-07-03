@@ -4,18 +4,24 @@ import Link from "next/link";
 import { Menu, ShoppingCart, X } from "lucide-react";
 import { useState } from "react";
 import { useCart } from "@/hooks/useCart";
+import { useCollections } from "@/hooks/useCollections";
 
 const nav = [
   { href: "/", label: "Home" },
   { href: "/shop", label: "Shop" },
-  { href: "/hot-items", label: "Hot Items" },
-  { href: "/deals", label: "Deals" }
+  { href: "/hot-items", label: "Hot Items" }
 ];
 
 export function Navbar() {
   const { itemCount, openCartDrawer } = useCart();
+  const { navbarCollections } = useCollections();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const cartLabel = itemCount ? `Cart - ${itemCount}` : "Cart";
+  const navItems = [
+    ...nav,
+    ...navbarCollections.map((collection) => ({ href: `/collections/${collection.slug}`, label: collection.name })),
+    { href: "/deals", label: "Deals" }
+  ];
 
   function closeMenu() {
     setIsMenuOpen(false);
@@ -40,7 +46,7 @@ export function Navbar() {
         </div>
 
         <div className="hidden items-center justify-center gap-6 md:flex">
-          {nav.map((item) => (
+          {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -91,7 +97,7 @@ export function Navbar() {
           }`}
         >
           <div className="grid gap-1 p-2">
-            {nav.map((item) => (
+            {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

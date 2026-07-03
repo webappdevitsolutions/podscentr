@@ -17,6 +17,12 @@ export type CatalogProduct = Product & {
   vendor: string;
   productType: string;
   collections: string;
+  collectionIds: string[];
+  collectionList: Array<{
+    id: string;
+    name: string;
+    slug: string;
+  }>;
   tags: string;
   marketplace: Marketplace;
   sourceUrl: string;

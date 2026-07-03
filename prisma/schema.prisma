@@ -13,6 +13,11 @@ enum ProductStatus {
   Archived
 }
 
+enum CollectionStatus {
+  Active
+  Draft
+}
+
 enum Marketplace {
   Amazon
   Flipkart
@@ -102,6 +107,23 @@ model Product {
   variants            ProductVariant[]
   inventory           Inventory?
   orderItems          OrderItem[]
+  collectionLinks     Collection[]     @relation("ProductCollections")
+}
+
+model Collection {
+  id           String           @id @default(cuid())
+  name         String
+  slug         String           @unique
+  description  String           @default("")
+  image        String           @default("")
+  status       CollectionStatus @default(Draft)
+  showInNavbar Boolean          @default(false)
+  sortOrder    Int              @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  products     Product[]        @relation("ProductCollections")
+
+  @@index([status, showInNavbar, sortOrder])
 }
 
 model ProductImage {
