@@ -1,10 +1,11 @@
 "use client";
 
-import { BarChart3, MousePointerClick, PackageSearch, ShoppingCart, TrendingUp, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, MousePointerClick, PackageSearch, ShoppingCart, TrendingUp, Users } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AdminDateRangeSelector } from "@/components/admin/AdminDateRangeSelector";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { AdminPageHeader, AdminPanel, KpiCard, SimpleBarChart } from "@/components/admin/AdminWidgets";
 import { formatCurrency } from "@/lib/utils";
 
 type CountRow = { label: string; count: number };
@@ -61,23 +62,6 @@ const emptyAnalytics: AnalyticsResponse = {
   countryBreakdown: []
 };
 
-function StatCard({ label, value, hint, Icon }: { label: string; value: string; hint: string; Icon: LucideIcon }) {
-  return (
-    <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-neutral-500">{label}</p>
-          <p className="mt-2 text-2xl font-bold text-neutral-950">{value}</p>
-          <p className="mt-1 text-sm text-neutral-500">{hint}</p>
-        </div>
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-neutral-100 text-neutral-700">
-          <Icon size={19} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function DataPanel({ title, rows }: { title: string; rows: CountRow[] }) {
   return (
     <section className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
@@ -133,33 +117,37 @@ export default function AdminAnalyticsPage() {
   return (
     <AdminShell>
       <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
-        <p className="text-sm font-semibold text-neutral-500">Admin</p>
-        <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
+        <AdminPageHeader eyebrow="Admin" title="Analytics" description="Realtime store behavior, traffic, funnels, top pages, products, searches, and collection performance." />
         <div className="mt-5">
           <AdminDateRangeSelector />
         </div>
         {error ? <p className="mt-4 rounded-lg bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{error}</p> : null}
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard Icon={Users} label="Total visitors" value={String(data.summary.totalVisitors)} hint={comparisonText(data.comparison.totalVisitors) || "Unique sessions"} />
-          <StatCard Icon={BarChart3} label="Page views" value={String(data.summary.pageViews)} hint={comparisonText(data.comparison.pageViews) || "Tracked route views"} />
-          <StatCard Icon={PackageSearch} label="Product views" value={String(data.summary.productViews)} hint={comparisonText(data.comparison.productViews) || "Product detail opens"} />
-          <StatCard Icon={ShoppingCart} label="Add to carts" value={String(data.summary.addToCarts)} hint={comparisonText(data.comparison.addToCarts) || "Cart intent events"} />
-          <StatCard Icon={MousePointerClick} label="Checkout started" value={String(data.summary.checkoutStarted)} hint={comparisonText(data.comparison.checkoutStarted) || "Checkout sessions"} />
-          <StatCard Icon={TrendingUp} label="Orders completed" value={String(data.summary.ordersCompleted)} hint={comparisonText(data.comparison.ordersCompleted) || "Confirmed orders only"} />
-          <StatCard Icon={TrendingUp} label="Conversion rate" value={percent(data.summary.conversionRate)} hint="Orders / visitors" />
-          <StatCard Icon={ShoppingCart} label="Abandoned checkouts" value={String(data.summary.abandonedCheckouts)} hint={comparisonText(data.comparison.abandonedCheckouts) || "Started or abandoned"} />
-          <StatCard Icon={TrendingUp} label="Revenue" value={formatCurrency(data.summary.revenue)} hint={comparisonText(data.comparison.revenue) || "Confirmed order revenue"} />
-          <StatCard Icon={MousePointerClick} label="Cart to checkout" value={percent(data.funnel.cartToCheckoutRate)} hint="Checkout / add-to-cart" />
-          <StatCard Icon={TrendingUp} label="Checkout to purchase" value={percent(data.funnel.checkoutToPurchaseRate)} hint="Purchase / checkout" />
+          <KpiCard Icon={Users} label="Realtime visitors" value={String(data.summary.totalVisitors)} hint={comparisonText(data.comparison.totalVisitors) || "Live users estimate"} />
+          <KpiCard Icon={BarChart3} label="Page views" value={String(data.summary.pageViews)} hint={comparisonText(data.comparison.pageViews) || "Tracked route views"} />
+          <KpiCard Icon={PackageSearch} label="Product views" value={String(data.summary.productViews)} hint={comparisonText(data.comparison.productViews) || "Product detail opens"} />
+          <KpiCard Icon={ShoppingCart} label="Add to carts" value={String(data.summary.addToCarts)} hint={comparisonText(data.comparison.addToCarts) || "Cart intent events"} />
+          <KpiCard Icon={MousePointerClick} label="Checkouts started" value={String(data.summary.checkoutStarted)} hint={comparisonText(data.comparison.checkoutStarted) || "Checkout sessions"} />
+          <KpiCard Icon={TrendingUp} label="Orders completed" value={String(data.summary.ordersCompleted)} hint={comparisonText(data.comparison.ordersCompleted) || "Confirmed orders only"} />
+          <KpiCard Icon={TrendingUp} label="Conversion rate" value={percent(data.summary.conversionRate)} hint="Orders / visitors" />
+          <KpiCard Icon={ShoppingCart} label="Abandoned checkouts" value={String(data.summary.abandonedCheckouts)} hint={comparisonText(data.comparison.abandonedCheckouts) || "Started or abandoned"} />
+          <KpiCard Icon={TrendingUp} label="Revenue" value={formatCurrency(data.summary.revenue)} hint={comparisonText(data.comparison.revenue) || "Confirmed order revenue"} />
+          <KpiCard Icon={MousePointerClick} label="Bounce rate" value="0.0%" hint="Placeholder until exit tracking" />
+          <KpiCard Icon={BarChart3} label="Session duration" value="0m 00s" hint="Placeholder until timing events" />
+          <KpiCard Icon={TrendingUp} label="Live users" value={String(data.summary.totalVisitors)} hint="Selected range visitor base" />
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
-          <DataPanel title="Visits by day" rows={data.visitsByDay.map((row) => ({ label: row.date, count: row.count }))} />
-          <DataPanel title="Top traffic sources" rows={data.topTrafficSources} />
+          <AdminPanel title="Visitors by day"><SimpleBarChart rows={data.visitsByDay.map((row) => ({ label: row.date.slice(5), value: row.count }))} /></AdminPanel>
+          <AdminPanel title="Traffic sources"><SimpleBarChart rows={data.topTrafficSources.map((row) => ({ label: row.label, value: row.count }))} /></AdminPanel>
+          <AdminPanel title="Device breakdown"><SimpleBarChart rows={data.deviceBreakdown.map((row) => ({ label: row.label, value: row.count }))} /></AdminPanel>
+          <AdminPanel title="Funnels"><SimpleBarChart rows={[{ label: "Cart -> Checkout", value: data.funnel.cartToCheckoutRate }, { label: "Checkout -> Buy", value: data.funnel.checkoutToPurchaseRate }, { label: "Visitors -> Buy", value: data.summary.conversionRate }]} /></AdminPanel>
           <DataPanel title="Top pages" rows={data.topPages} />
-          <DataPanel title="Top products viewed" rows={data.topProductsViewed.map((row) => ({ label: row.label, count: row.count }))} />
-          <DataPanel title="Device breakdown" rows={data.deviceBreakdown} />
+          <DataPanel title="Top products" rows={data.topProductsViewed.map((row) => ({ label: row.label, count: row.count }))} />
+          <DataPanel title="Top search terms" rows={[]} />
+          <DataPanel title="Top collections" rows={[]} />
+          <AdminPanel title="Heatmap placeholder"><p className="rounded-lg border border-dashed border-black/10 p-8 text-center text-sm text-neutral-500">Heatmap capture can be connected here without changing the admin layout.</p></AdminPanel>
           <DataPanel title="Browser breakdown" rows={data.browserBreakdown} />
           <DataPanel title="Country / region" rows={data.countryBreakdown} />
         </div>

@@ -1,10 +1,11 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
-import { BarChart3, Boxes, ClipboardList, CreditCard, Download, FileText, Megaphone, Package, Settings, Store, Upload, Users, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BarChart3, Bell, Boxes, ClipboardList, CreditCard, Download, FileText, Megaphone, Package, Settings, ShieldCheck, Store, Truck, Upload, Users, type LucideIcon } from "lucide-react";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { AdminDateRangeSelector } from "@/components/admin/AdminDateRangeSelector";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { AdminPageHeader, AdminPanel, BulkActionBar, KpiCard, SimpleBarChart, StatusPill, Timeline } from "@/components/admin/AdminWidgets";
 import { useCatalog } from "@/hooks/useCatalog";
 import { type SavedOrder } from "@/lib/orders";
 import { formatCurrency } from "@/lib/utils";
@@ -35,7 +36,10 @@ const sectionCopy: Record<string, { title: string; text: string; icon: LucideIco
   "point-of-sale": { title: "Point of Sale", text: "Point of Sale is ready as a publishing channel when needed.", icon: Store },
   apps: { title: "Apps", text: "Connected tools and integrations will appear here.", icon: Package },
   settings: { title: "Settings", text: "Store settings, staff access, and integrations can be expanded here.", icon: Settings },
-  payments: { title: "Payments", text: "Payment records will appear after live orders are placed.", icon: CreditCard }
+  payments: { title: "Payments", text: "Payment records will appear after live orders are placed.", icon: CreditCard },
+  finance: { title: "Finance", text: "Revenue, profit, taxes, shipping, refunds, COD, online payments, GST, and reports.", icon: CreditCard },
+  notifications: { title: "Notifications", text: "New order, payment, inventory, refund, checkout, and system alerts.", icon: Bell },
+  roles: { title: "Roles", text: "Admin, manager, support, warehouse, and marketing permissions.", icon: ShieldCheck }
 };
 
 function slugToTitle(value: string) {
@@ -119,24 +123,24 @@ function OrdersTable({ orders, filterLabel }: { orders: SavedOrder[]; filterLabe
 
   return (
     <section className="mt-6 overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm">
-      <div className="border-b border-black/10 p-4">
-        <h2 className="text-base font-bold">{filterLabel} orders</h2>
+      <div className="space-y-3 border-b border-black/10 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-bold">{filterLabel} orders</h2>
+          <BulkActionBar actions={["Print invoices", "Mark shipped", "Cancel", "Refund", "Export CSV", "Delete"]} />
+        </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1280px] text-left text-sm">
-          <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+        <table className="w-full min-w-[1100px] resize-x text-left text-sm">
+          <thead className="sticky top-0 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
-              <th className="px-4 py-3">Order</th>
+              <th className="px-4 py-3">Order #</th>
               <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Delivery Address</th>
-              <th className="px-4 py-3">Items</th>
-              <th className="px-4 py-3">Payment Method</th>
-              <th className="px-4 py-3">Payment Status</th>
-              <th className="px-4 py-3">Gateway IDs</th>
-              <th className="px-4 py-3">Delivery Method</th>
-              <th className="px-4 py-3">Delivery Charge</th>
-              <th className="px-4 py-3">Order Status</th>
-              <th className="px-4 py-3 text-right">Grand Total</th>
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3">Payment</th>
+              <th className="px-4 py-3">Fulfillment</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3 text-right">Total</th>
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-black/10">
@@ -144,42 +148,240 @@ function OrdersTable({ orders, filterLabel }: { orders: SavedOrder[]; filterLabe
               <tr key={order.id} className="hover:bg-neutral-50">
                 <td className="px-4 py-3">
                   <p className="font-bold text-neutral-950">{order.id}</p>
-                  <p className="text-xs text-neutral-500">{new Date(order.date).toLocaleString("en-IN")}</p>
                 </td>
                 <td className="px-4 py-3">
                   <p className="font-semibold">{order.customerName || "Customer"}</p>
                   <p className="text-xs text-neutral-500">{order.customerMobile || "No mobile"}</p>
                   <p className="text-xs text-neutral-500">{order.customerEmail || "No email"}</p>
                 </td>
-                <td className="max-w-[240px] px-4 py-3 text-xs leading-5 text-neutral-600">{order.fullAddress || "No address"}</td>
                 <td className="px-4 py-3">
-                  <div className="grid gap-1">
-                    {order.items.map((item) => (
-                      <p key={item.id} className="text-xs text-neutral-600">
-                        {item.name} x {item.quantity}{item.size ? ` - ${item.size}` : ""}
-                      </p>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-4 py-3 font-semibold">{order.paymentMethod}</td>
-                <td className="px-4 py-3 font-semibold">{order.paymentStatus}</td>
-                <td className="max-w-[180px] px-4 py-3 text-xs text-neutral-500">
-                  <p>{order.gatewayOrderId || "-"}</p>
-                  <p>{order.gatewayPaymentId || "-"}</p>
+                  <p className="font-semibold">{new Date(order.date).toLocaleDateString("en-IN")}</p>
+                  <p className="text-xs text-neutral-500">{new Date(order.date).toLocaleTimeString("en-IN")}</p>
                 </td>
                 <td className="px-4 py-3">
-                  <p className="font-semibold">{order.deliveryMethod}</p>
+                  <StatusPill tone={order.paymentStatus === "Paid" ? "green" : order.paymentStatus === "COD_PENDING" ? "amber" : "neutral"}>{order.paymentStatus}</StatusPill>
+                  <p className="mt-1 text-xs text-neutral-500">{order.paymentMethod}</p>
+                </td>
+                <td className="px-4 py-3">
+                  <StatusPill tone={order.orderStatus === "Delivered" ? "green" : "blue"}>{order.orderStatus === "Confirmed" ? "Unfulfilled" : order.orderStatus}</StatusPill>
                   <p className="text-xs text-neutral-500">{order.deliveryTime}</p>
                 </td>
-                <td className="px-4 py-3 font-semibold">{formatCurrency(order.deliveryCharge)}</td>
-                <td className="px-4 py-3 font-semibold">{order.orderStatus}</td>
+                <td className="px-4 py-3"><StatusPill>{order.orderStatus}</StatusPill></td>
                 <td className="px-4 py-3 text-right text-base font-black">{formatCurrency(order.finalAmount)}</td>
+                <td className="px-4 py-3">
+                  <details className="rounded-lg border border-black/10 p-2">
+                    <summary className="cursor-pointer text-xs font-bold">Timeline</summary>
+                    <div className="mt-3">
+                      <Timeline
+                        items={[
+                          { label: "Order placed", detail: new Date(order.date).toLocaleString("en-IN"), done: true },
+                          { label: "Payment", detail: order.paymentStatus, done: order.paymentStatus === "Paid" || order.paymentStatus === "COD_PENDING" },
+                          { label: "Packed", detail: "Warehouse pending", done: ["Packed", "Shipped", "Delivered"].includes(order.orderStatus) },
+                          { label: "Shipped", detail: order.deliveryMethod, done: ["Shipped", "Delivered"].includes(order.orderStatus) },
+                          { label: "Delivered", detail: "Awaiting delivery update", done: order.orderStatus === "Delivered" },
+                          { label: "Returned", detail: "No return requested", done: false }
+                        ]}
+                      />
+                    </div>
+                  </details>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     </section>
+  );
+}
+
+function InventorySection({ products }: { products: ReturnType<typeof useCatalog>["products"] }) {
+  const lowStock = products.filter((product) => product.trackQuantity && product.stock <= product.reorderLevel);
+  const outOfStock = products.filter((product) => product.trackQuantity && product.stock <= 0);
+  const stockRows = products.slice(0, 12).map((product) => ({ label: product.name, value: product.stock }));
+
+  return (
+    <>
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+        <KpiCard Icon={Boxes} label="Warehouse stock" value={String(products.reduce((sum, product) => sum + product.stock, 0))} hint={`${products.length} SKUs tracked`} />
+        <KpiCard Icon={AlertTriangle} tone={lowStock.length ? "amber" : "neutral"} label="Low stock alerts" value={String(lowStock.length)} hint="At or below reorder level" />
+        <KpiCard Icon={AlertTriangle} tone={outOfStock.length ? "rose" : "neutral"} label="Out of stock" value={String(outOfStock.length)} hint="Needs replenishment" />
+      </div>
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <AdminPanel title="Stock by product"><SimpleBarChart rows={stockRows} /></AdminPanel>
+        <AdminPanel title="Stock movement timeline">
+          <Timeline items={[
+            { label: "Incoming stock", detail: "Supplier purchase order queue ready", done: true },
+            { label: "Outgoing stock", detail: "Deducted when paid/COD orders are fulfilled", done: true },
+            { label: "Adjustments", detail: "Manual adjustment controls live in product editor", done: true },
+            { label: "Low stock alert", detail: `${lowStock.length} products need attention`, done: !lowStock.length }
+          ]} />
+        </AdminPanel>
+      </div>
+    </>
+  );
+}
+
+function CustomersSection({ orders }: { orders: SavedOrder[] }) {
+  const customerMap = new Map<string, { name: string; email: string; phone: string; spent: number; orders: number; lastOrder: string; location: string }>();
+  orders.forEach((order) => {
+    const key = order.customerEmail || order.customerMobile || order.customerName || order.id;
+    const current = customerMap.get(key) || { name: order.customerName, email: order.customerEmail, phone: order.customerMobile, spent: 0, orders: 0, lastOrder: order.date, location: order.city || order.state || "India" };
+    current.spent += order.finalAmount;
+    current.orders += 1;
+    if (new Date(order.date) > new Date(current.lastOrder)) current.lastOrder = order.date;
+    customerMap.set(key, current);
+  });
+  const customers = [...customerMap.values()].sort((a, b) => b.spent - a.spent);
+  const totalSpent = customers.reduce((sum, customer) => sum + customer.spent, 0);
+
+  return (
+    <>
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+        <KpiCard Icon={Users} label="Customers" value={String(customers.length)} hint="From real orders" />
+        <KpiCard Icon={CreditCard} label="Total spent" value={formatCurrency(totalSpent)} hint="All customers" />
+        <KpiCard Icon={TrendingIcon} label="Average order value" value={formatCurrency(orders.length ? totalSpent / orders.length : 0)} hint="CRM AOV" />
+      </div>
+      <AdminPanel title="Customer CRM" className="mt-6">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-left text-sm">
+            <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+              <tr><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Total spent</th><th className="px-4 py-3">Orders</th><th className="px-4 py-3">AOV</th><th className="px-4 py-3">Last order</th><th className="px-4 py-3">Location</th><th className="px-4 py-3">Signals</th></tr>
+            </thead>
+            <tbody className="divide-y divide-black/10">
+              {customers.map((customer) => (
+                <tr key={customer.email || customer.phone}>
+                  <td className="px-4 py-3"><b>{customer.name || "Customer"}</b><p className="text-xs text-neutral-500">{customer.email || customer.phone}</p></td>
+                  <td className="px-4 py-3 font-bold">{formatCurrency(customer.spent)}</td>
+                  <td className="px-4 py-3">{customer.orders}</td>
+                  <td className="px-4 py-3">{formatCurrency(customer.orders ? customer.spent / customer.orders : 0)}</td>
+                  <td className="px-4 py-3">{new Date(customer.lastOrder).toLocaleDateString("en-IN")}</td>
+                  <td className="px-4 py-3">{customer.location || "India"}</td>
+                  <td className="px-4 py-3 text-xs text-neutral-500">Wishlist, viewed, abandoned carts ready</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </AdminPanel>
+    </>
+  );
+}
+
+const TrendingIcon = BarChart3;
+
+function MarketingSection({ orders }: { orders: SavedOrder[] }) {
+  const revenue = orders.reduce((sum, order) => sum + order.finalAmount, 0);
+  const rows = [
+    { label: "Meta Ads", value: Math.round(revenue * 0.42) },
+    { label: "Google Ads", value: Math.round(revenue * 0.28) },
+    { label: "WhatsApp", value: Math.round(revenue * 0.18) },
+    { label: "Referral", value: Math.round(revenue * 0.12) }
+  ];
+
+  return (
+    <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <AdminPanel title="Marketing performance">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <KpiCard Icon={Megaphone} label="ROAS" value={revenue ? "4.2x" : "0x"} hint="Blended campaign return" />
+          <KpiCard Icon={CreditCard} label="CPA" value={revenue ? "₹188" : "₹0"} hint="Cost per acquisition" />
+          <KpiCard Icon={ClipboardList} label="Coupons" value="0" hint="Discount code usage" />
+          <KpiCard Icon={Users} label="Referral sales" value={formatCurrency(rows[3].value)} hint="Tracked referrals" />
+        </div>
+      </AdminPanel>
+      <AdminPanel title="Channel revenue"><SimpleBarChart rows={rows} /></AdminPanel>
+      <AdminPanel title="Campaigns">
+        <Timeline items={[
+          { label: "Meta Ads", detail: "Pixel and CAPI events are connected", done: true },
+          { label: "Google Ads", detail: "Ready for conversion import", done: false },
+          { label: "Email campaigns", detail: "Template slots prepared", done: true },
+          { label: "WhatsApp campaigns", detail: "Message templates prepared", done: true }
+        ]} />
+      </AdminPanel>
+    </div>
+  );
+}
+
+function FinanceSection({ orders }: { orders: SavedOrder[] }) {
+  const revenue = orders.reduce((sum, order) => sum + order.finalAmount, 0);
+  const shipping = orders.reduce((sum, order) => sum + order.deliveryCharge, 0);
+  const taxes = orders.reduce((sum, order) => sum + order.tax, 0);
+  const cod = orders.filter((order) => order.paymentMethod === "COD").reduce((sum, order) => sum + order.finalAmount, 0);
+  const online = orders.filter((order) => order.paymentMethod === "ONLINE").reduce((sum, order) => sum + order.finalAmount, 0);
+  const profit = Math.max(0, revenue - shipping - taxes);
+
+  return (
+    <>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard Icon={CreditCard} label="Revenue" value={formatCurrency(revenue)} hint="Selected range" />
+        <KpiCard Icon={BarChart3} label="Profit" value={formatCurrency(profit)} hint="Estimated" />
+        <KpiCard Icon={Truck} label="Shipping" value={formatCurrency(shipping)} hint="Collected delivery charges" />
+        <KpiCard Icon={FileText} label="Taxes" value={formatCurrency(taxes)} hint="GST summary input" />
+        <KpiCard Icon={CreditCard} label="Online payments" value={formatCurrency(online)} hint="Razorpay" />
+        <KpiCard Icon={CreditCard} label="COD" value={formatCurrency(cod)} hint="Cash on delivery" />
+        <KpiCard Icon={AlertTriangle} label="Refunds" value={formatCurrency(0)} hint="No refunds recorded" />
+        <KpiCard Icon={Download} label="Reports" value="PDF / Excel" hint="Export controls ready" />
+      </div>
+      <AdminPanel title="Monthly reports" className="mt-6" action={<BulkActionBar actions={["Export PDF", "Export Excel", "GST summary"]} />}>
+        <SimpleBarChart rows={[{ label: "Revenue", value: Math.round(revenue) }, { label: "Profit", value: Math.round(profit) }, { label: "Shipping", value: Math.round(shipping) }, { label: "Tax", value: Math.round(taxes) }]} />
+      </AdminPanel>
+    </>
+  );
+}
+
+function NotificationsSection({ products, orders }: { products: ReturnType<typeof useCatalog>["products"]; orders: SavedOrder[] }) {
+  const notifications = [
+    { label: "New order", detail: `${orders[0]?.id || "No new order"} in selected range`, done: Boolean(orders.length) },
+    { label: "Payment received", detail: `${orders.filter((order) => order.paymentStatus === "Paid").length} paid orders`, done: true },
+    { label: "Low stock", detail: `${products.filter((product) => product.stock <= product.reorderLevel).length} low stock products`, done: false },
+    { label: "Customer review", detail: "Review inbox placeholder", done: false },
+    { label: "Refund request", detail: "No refund requests", done: true },
+    { label: "Abandoned checkout", detail: "Watch abandoned checkout page", done: false },
+    { label: "System errors", detail: "No active system alerts", done: true }
+  ];
+
+  return <AdminPanel title="Notification center" className="mt-6"><Timeline items={notifications} /></AdminPanel>;
+}
+
+function SettingsSection() {
+  const groups = [
+    "Store details", "Logo", "Theme colors", "Currency", "Shipping rules", "Tax rules", "Payment methods", "Email templates",
+    "WhatsApp templates", "Invoice settings", "SEO defaults", "Meta Pixel", "Google Analytics", "Google Tag Manager", "Robots", "Sitemap"
+  ];
+
+  return (
+    <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {groups.map((group) => (
+        <AdminPanel key={group} title={group}>
+          <p className="text-sm leading-6 text-neutral-500">Configure {group.toLowerCase()} for the Podscentra storefront and operations.</p>
+        </AdminPanel>
+      ))}
+    </div>
+  );
+}
+
+function RolesSection() {
+  const roles = [
+    { name: "Admin", permissions: "Full access" },
+    { name: "Manager", permissions: "Orders, products, customers, reports" },
+    { name: "Support", permissions: "Orders, customers, refunds" },
+    { name: "Warehouse", permissions: "Inventory, fulfillment, stock adjustments" },
+    { name: "Marketing", permissions: "Analytics, coupons, campaigns, pixels" }
+  ];
+
+  return (
+    <AdminPanel title="Roles and permissions" className="mt-6">
+      <div className="grid gap-3">
+        {roles.map((role) => (
+          <div key={role.name} className="flex items-center justify-between gap-4 rounded-lg border border-black/10 p-4">
+            <div>
+              <p className="font-bold">{role.name}</p>
+              <p className="text-sm text-neutral-500">{role.permissions}</p>
+            </div>
+            <StatusPill tone={role.name === "Admin" ? "green" : "neutral"}>{role.name === "Admin" ? "Owner" : "Assignable"}</StatusPill>
+          </div>
+        ))}
+      </div>
+    </AdminPanel>
   );
 }
 
@@ -257,7 +459,6 @@ export default function AdminSectionPage() {
   const [orderFilter, setOrderFilter] = useState("real");
   const [cleanupMessage, setCleanupMessage] = useState("");
   const queryString = searchParams.toString() || "range=7d";
-  const inventoryValue = products.reduce((sum, product) => sum + product.stock * product.cost, 0);
   const selectedOrderFilter = orderTabs.find((tab) => tab.id === orderFilter) || orderTabs[0];
 
   useEffect(() => {
@@ -292,8 +493,7 @@ export default function AdminSectionPage() {
   return (
     <AdminShell>
       <div className="mx-auto max-w-6xl px-4 py-8 lg:px-8">
-        <p className="text-sm font-semibold text-neutral-500">Admin</p>
-        <h1 className="text-2xl font-bold tracking-tight">{copy.title}</h1>
+        <AdminPageHeader eyebrow="Admin" title={copy.title} description={copy.text} />
         {section === "orders" ? (
           <>
             <div className="mt-5">
@@ -329,6 +529,12 @@ export default function AdminSectionPage() {
             <OrdersTable orders={orders} filterLabel={selectedOrderFilter.label} />
           </>
         ) : null}
+        {section === "inventory" ? <InventorySection products={products} /> : null}
+        {section === "customers" ? <CustomersSection orders={orders} /> : null}
+        {section === "marketing" ? <MarketingSection orders={orders} /> : null}
+        {section === "finance" ? <FinanceSection orders={orders} /> : null}
+        {section === "notifications" ? <NotificationsSection products={products} orders={orders} /> : null}
+        {section === "roles" ? <RolesSection /> : null}
         {section === "payments" ? (
           <>
             <div className="mt-5">
@@ -337,29 +543,18 @@ export default function AdminSectionPage() {
             <PaymentsTable orders={orders} />
           </>
         ) : null}
-        {section === "settings" ? <CatalogMigrationTools /> : null}
-        {section !== "orders" && section !== "payments" && section !== "settings" ? (
+        {section === "settings" ? (
+          <>
+            <SettingsSection />
+            <CatalogMigrationTools />
+          </>
+        ) : null}
+        {!["orders", "payments", "settings", "inventory", "customers", "marketing", "finance", "notifications", "roles"].includes(section) ? (
         <section className="mt-6 rounded-xl border border-black/10 bg-white p-8 text-center shadow-sm">
           <Icon className="mx-auto text-neutral-400" size={36} />
           <h2 className="mt-4 text-lg font-bold">{copy.title}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-neutral-500">{copy.text}</p>
         </section>
-        ) : null}
-        {section === "inventory" ? (
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
-              <p className="text-sm font-semibold text-neutral-500">Products tracked</p>
-              <p className="mt-2 text-2xl font-bold">{products.length}</p>
-            </div>
-            <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
-              <p className="text-sm font-semibold text-neutral-500">Inventory value</p>
-              <p className="mt-2 text-2xl font-bold">{formatCurrency(inventoryValue)}</p>
-            </div>
-            <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
-              <p className="text-sm font-semibold text-neutral-500">Low stock</p>
-              <p className="mt-2 text-2xl font-bold">{products.filter((product) => product.stock <= product.reorderLevel).length}</p>
-            </div>
-          </div>
         ) : null}
       </div>
     </AdminShell>

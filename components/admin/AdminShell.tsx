@@ -9,17 +9,24 @@ import {
   Blocks,
   Boxes,
   ClipboardList,
+  Command,
+  DollarSign,
   FileText,
   FolderOpen,
   Gift,
   Home,
   LogOut,
   Megaphone,
+  Moon,
+  Search,
+  ShieldCheck,
   Package,
   Settings,
   ShoppingBag,
   ShoppingCart,
   Smartphone,
+  Sun,
+  Bell,
   Store,
   Users,
   type LucideIcon
@@ -50,6 +57,9 @@ const primaryItems: NavItem[] = [
   { label: "Analytics", href: "/admin/analytics", Icon: BarChart3 },
   { label: "Abandoned Checkouts", href: "/admin/abandoned-checkouts", Icon: ShoppingCart },
   { label: "Marketing", href: "/admin/marketing", Icon: Megaphone },
+  { label: "Finance", href: "/admin/finance", Icon: DollarSign },
+  { label: "Notifications", href: "/admin/notifications", Icon: Bell },
+  { label: "Roles", href: "/admin/roles", Icon: ShieldCheck },
   { label: "Discounts", href: "/admin/discounts", Icon: BadgePercent }
 ];
 
@@ -129,11 +139,34 @@ function LoginGate({ onLogin }: { onLogin: () => void }) {
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [darkMode, setDarkMode] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     setIsLoggedIn(localStorage.getItem(sessionKey) === "active");
+    setDarkMode(localStorage.getItem("podscentra-admin-dark") === "1");
   }, []);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  function toggleDarkMode() {
+    setDarkMode((current) => {
+      const next = !current;
+      localStorage.setItem("podscentra-admin-dark", next ? "1" : "0");
+      return next;
+    });
+  }
 
   function logout() {
     void fetch("/api/admin/logout", { method: "POST" });
@@ -151,8 +184,26 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f1f1f1] text-neutral-950">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-black/10 bg-[#ececec] px-2 py-4 lg:block">
+    <div className={cn("min-h-screen text-neutral-950", darkMode ? "bg-neutral-950" : "bg-[#f1f1f1]")}>
+      {searchOpen ? (
+        <div className="fixed inset-0 z-50 bg-black/30 p-4 backdrop-blur-sm" onClick={() => setSearchOpen(false)}>
+          <div className="mx-auto mt-24 max-w-2xl rounded-xl border border-black/10 bg-white p-3 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <label className="flex min-h-12 items-center gap-3 rounded-lg bg-neutral-50 px-4 text-sm text-neutral-500">
+              <Search size={18} />
+              <input autoFocus placeholder="Search orders, products, customers, settings..." className="w-full bg-transparent outline-none" />
+              <span className="rounded-md border border-black/10 px-2 py-1 text-xs font-bold">Esc</span>
+            </label>
+            <div className="mt-3 grid gap-1">
+              {[...primaryItems, ...salesItems, { label: "Settings", href: "/admin/settings", Icon: Settings }, { label: "Roles", href: "/admin/roles", Icon: ShieldCheck }].map((item) => (
+                <Link key={item.href} href={item.href} onClick={() => setSearchOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold hover:bg-neutral-50">
+                  <item.Icon size={16} /> {item.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+      <aside className={cn("fixed inset-y-0 left-0 z-30 hidden w-64 border-r px-2 py-4 lg:block", darkMode ? "border-white/10 bg-neutral-900 text-white" : "border-black/10 bg-[#ececec]")}>
         <div className="mb-3 px-3">
           <img src="/img/podcentalogo.png" alt="Podscentra logo" className="h-10 w-auto max-w-[140px] object-contain" />
           <p className="text-xs text-neutral-500">Admin</p>
@@ -196,7 +247,25 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           ))}
         </div>
       </div>
-      <main className="lg:pl-60">{children}</main>
+      <div className="hidden border-b border-black/10 bg-white/80 px-5 py-3 backdrop-blur lg:block lg:pl-64">
+        <div className="flex items-center justify-between gap-4">
+          <button onClick={() => setSearchOpen(true)} className="flex min-h-10 w-full max-w-xl items-center gap-3 rounded-lg border border-black/10 bg-neutral-50 px-4 text-sm font-semibold text-neutral-500 hover:bg-white">
+            <Search size={17} /> Search admin
+            <span className="ml-auto inline-flex items-center gap-1 rounded-md border border-black/10 bg-white px-2 py-1 text-xs font-bold">
+              <Command size={12} /> K
+            </span>
+          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={toggleDarkMode} className="grid h-10 w-10 place-items-center rounded-lg border border-black/10 bg-white hover:bg-neutral-50" aria-label="Toggle dark mode">
+              {darkMode ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+            <Link href="/admin/notifications" className="grid h-10 w-10 place-items-center rounded-lg border border-black/10 bg-white hover:bg-neutral-50" aria-label="Notifications">
+              <Bell size={17} />
+            </Link>
+          </div>
+        </div>
+      </div>
+      <main className="lg:pl-64">{children}</main>
     </div>
   );
 }

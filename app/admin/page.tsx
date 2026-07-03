@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, Boxes, ClipboardList, CreditCard, MousePointerClick, PackagePlus, ShoppingBag, TrendingUp, Users, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Boxes, ClipboardList, CreditCard, PackagePlus, Repeat, ShoppingBag, TrendingUp, Users } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AdminDateRangeSelector } from "@/components/admin/AdminDateRangeSelector";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { AdminPageHeader, AdminPanel, KpiCard, SimpleBarChart, SkeletonGrid } from "@/components/admin/AdminWidgets";
 import { useCatalog } from "@/hooks/useCatalog";
 import { isRealOrder, type SavedOrder } from "@/lib/orders";
 import { formatCurrency } from "@/lib/utils";
@@ -23,6 +24,10 @@ type DashboardAnalytics = {
     revenue: number;
   };
   comparison: Partial<Record<string, number>>;
+  visitsByDay?: Array<{ date: string; count: number }>;
+  deviceBreakdown?: Array<{ label: string; count: number }>;
+  topTrafficSources?: Array<{ label: string; count: number }>;
+  topProductsViewed?: Array<{ productId: string; label: string; count: number }>;
 };
 
 const emptyDashboardAnalytics: DashboardAnalytics = {
@@ -37,59 +42,46 @@ const emptyDashboardAnalytics: DashboardAnalytics = {
     abandonedCheckouts: 0,
     revenue: 0
   },
-  comparison: {}
+  comparison: {},
+  visitsByDay: [],
+  deviceBreakdown: [],
+  topTrafficSources: [],
+  topProductsViewed: []
 };
-
-function StatCard({ label, value, hint, Icon }: { label: string; value: string; hint: string; Icon?: LucideIcon }) {
-  const CardIcon = Icon;
-  return (
-    <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-neutral-500">{label}</p>
-          <p className="mt-2 text-2xl font-bold text-neutral-950">{value}</p>
-          <p className="mt-1 text-sm text-neutral-500">{hint}</p>
-        </div>
-        {CardIcon ? (
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-neutral-100 text-neutral-700">
-            <CardIcon size={19} />
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function EmptyPanel({ title, text, Icon }: { title: string; text: string; Icon: typeof ShoppingBag }) {
-  return (
-    <div className="rounded-xl border border-dashed border-black/15 bg-white p-6 text-center">
-      <Icon className="mx-auto text-neutral-400" size={30} />
-      <h2 className="mt-3 text-base font-bold">{title}</h2>
-      <p className="mt-1 text-sm text-neutral-500">{text}</p>
-    </div>
-  );
-}
 
 export default function AdminDashboardPage() {
   const searchParams = useSearchParams();
   const { products } = useCatalog();
   const [orders, setOrders] = useState<SavedOrder[]>([]);
+  const [todayOrders, setTodayOrders] = useState<SavedOrder[]>([]);
+  const [monthOrders, setMonthOrders] = useState<SavedOrder[]>([]);
   const [analytics, setAnalytics] = useState<DashboardAnalytics>(emptyDashboardAnalytics);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
   const queryString = searchParams.toString() || "range=7d";
   const activeProducts = products.filter((product) => product.status === "Active").length;
   const draftProducts = products.filter((product) => product.status === "Draft").length;
-  const inventoryValue = products.reduce((sum, product) => sum + product.stock * product.cost, 0);
   const lowStock = products.filter((product) => product.trackQuantity && product.stock <= product.reorderLevel).length;
+  const outOfStock = products.filter((product) => product.trackQuantity && product.stock <= 0).length;
   const realOrders = orders.filter(isRealOrder);
-  const paidOnlineTotal = realOrders
-    .filter((order) => order.paymentMethod === "ONLINE" && order.paymentStatus === "Paid")
-    .reduce((sum, order) => sum + order.finalAmount, 0);
-
+  const realTodayOrders = todayOrders.filter(isRealOrder);
+  const realMonthOrders = monthOrders.filter(isRealOrder);
+  const revenueToday = realTodayOrders.reduce((sum, order) => sum + order.finalAmount, 0);
+  const revenueMonth = realMonthOrders.reduce((sum, order) => sum + order.finalAmount, 0);
+  const averageOrderValue = realOrders.length ? realOrders.reduce((sum, order) => sum + order.finalAmount, 0) / realOrders.length : 0;
+  const pendingOrders = orders.filter((order) => order.paymentStatus === "Pending" || order.orderStatus === "New").length;
+  const returningCustomers = new Set(realOrders.map((order) => order.customerEmail).filter(Boolean)).size;
   useEffect(() => {
     async function refreshOrders() {
-      const response = await fetch(`/api/orders?${queryString}`, { cache: "no-store" });
-      if (!response.ok) return;
-      setOrders((await response.json()) as SavedOrder[]);
+      setIsDashboardLoading(true);
+      const [rangeResponse, todayResponse, monthResponse] = await Promise.all([
+        fetch(`/api/orders?${queryString}`, { cache: "no-store" }),
+        fetch("/api/orders?range=today", { cache: "no-store" }),
+        fetch("/api/orders?range=this_month", { cache: "no-store" })
+      ]);
+      if (rangeResponse.ok) setOrders((await rangeResponse.json()) as SavedOrder[]);
+      if (todayResponse.ok) setTodayOrders((await todayResponse.json()) as SavedOrder[]);
+      if (monthResponse.ok) setMonthOrders((await monthResponse.json()) as SavedOrder[]);
+      setIsDashboardLoading(false);
     }
 
     void refreshOrders();
@@ -111,42 +103,89 @@ export default function AdminDashboardPage() {
     return `${sign}${value.toFixed(1)}% vs previous period`;
   }
 
+  const ordersByDay = useMemo(() => {
+    const map = new Map<string, number>();
+    realOrders.forEach((order) => {
+      const key = new Date(order.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+      map.set(key, (map.get(key) || 0) + 1);
+    });
+    return [...map.entries()].slice(-10).map(([label, value]) => ({ label, value }));
+  }, [realOrders]);
+
+  const revenueByDay = useMemo(() => {
+    const map = new Map<string, number>();
+    realOrders.forEach((order) => {
+      const key = new Date(order.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+      map.set(key, (map.get(key) || 0) + order.finalAmount);
+    });
+    return [...map.entries()].slice(-10).map(([label, value]) => ({ label, value: Math.round(value) }));
+  }, [realOrders]);
+
+  const bestSellingProducts = useMemo(() => {
+    const map = new Map<string, number>();
+    realOrders.flatMap((order) => order.items).forEach((item) => {
+      map.set(item.name, (map.get(item.name) || 0) + item.quantity);
+    });
+    return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([label, value]) => ({ label, value }));
+  }, [realOrders]);
+
   return (
     <AdminShell>
-      <div className="mx-auto max-w-6xl px-4 py-8 lg:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-neutral-500">Home</p>
-            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          </div>
+      <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
+        <AdminPageHeader
+          eyebrow="Home"
+          title="Dashboard"
+          description="Realtime storefront health, operations, revenue, inventory, and conversion signals."
+          action={
           <Link href="/admin/products/new" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-neutral-950 px-4 text-sm font-bold text-white hover:bg-neutral-800">
             <PackagePlus size={17} /> Add product
           </Link>
-        </div>
+          }
+        />
         <div className="mt-5">
           <AdminDateRangeSelector />
         </div>
 
+        {isDashboardLoading ? <div className="mt-6"><SkeletonGrid /></div> : null}
+
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard Icon={ShoppingBag} label="Products" value={String(products.length)} hint={`${activeProducts} active, ${draftProducts} draft`} />
-          <StatCard Icon={Boxes} label="Inventory value" value={formatCurrency(inventoryValue)} hint={`${lowStock} low-stock items`} />
-          <StatCard Icon={ClipboardList} label="Orders" value={String(realOrders.length)} hint={comparisonText(analytics.comparison.ordersCompleted) || "Confirmed orders only"} />
-          <StatCard Icon={CreditCard} label="Payments" value={formatCurrency(paidOnlineTotal)} hint={paidOnlineTotal ? "Paid online payments" : "No paid online payments yet"} />
-          <StatCard Icon={Users} label="Visitors" value={String(analytics.summary.totalVisitors)} hint={comparisonText(analytics.comparison.totalVisitors) || "Unique sessions"} />
-          <StatCard Icon={MousePointerClick} label="Product views" value={String(analytics.summary.productViews)} hint={comparisonText(analytics.comparison.productViews) || "Product detail opens"} />
-          <StatCard Icon={ShoppingBag} label="Add to carts" value={String(analytics.summary.addToCarts)} hint={comparisonText(analytics.comparison.addToCarts) || "Cart intent events"} />
-          <StatCard Icon={MousePointerClick} label="Checkouts started" value={String(analytics.summary.checkoutStarted)} hint={comparisonText(analytics.comparison.checkoutStarted) || "Checkout sessions"} />
-          <StatCard Icon={ShoppingBag} label="Abandoned checkouts" value={String(analytics.summary.abandonedCheckouts)} hint={comparisonText(analytics.comparison.abandonedCheckouts) || "Started or abandoned"} />
-          <StatCard Icon={TrendingUp} label="Revenue" value={formatCurrency(analytics.summary.revenue)} hint={comparisonText(analytics.comparison.revenue) || "Confirmed order revenue"} />
-          <StatCard Icon={TrendingUp} label="Conversion rate" value={`${analytics.summary.conversionRate.toFixed(1)}%`} hint="Orders / visitors" />
+          <KpiCard Icon={TrendingUp} tone="green" label="Revenue Today" value={formatCurrency(revenueToday)} hint={`${realTodayOrders.length} orders today`} />
+          <KpiCard Icon={TrendingUp} tone="green" label="Revenue This Month" value={formatCurrency(revenueMonth)} hint={`${realMonthOrders.length} orders this month`} />
+          <KpiCard Icon={ClipboardList} label="Orders Today" value={String(realTodayOrders.length)} hint="Confirmed, paid, COD" />
+          <KpiCard Icon={ClipboardList} label="Orders This Month" value={String(realMonthOrders.length)} hint={comparisonText(analytics.comparison.ordersCompleted) || "Month to date"} />
+          <KpiCard Icon={CreditCard} tone="blue" label="Average Order Value" value={formatCurrency(averageOrderValue)} hint="AOV for selected range" />
+          <KpiCard Icon={TrendingUp} label="Conversion Rate" value={`${analytics.summary.conversionRate.toFixed(1)}%`} hint="Orders / visitors" />
+          <KpiCard Icon={Users} label="Visitors" value={String(analytics.summary.totalVisitors)} hint={comparisonText(analytics.comparison.totalVisitors) || "Unique sessions"} />
+          <KpiCard Icon={Repeat} label="Returning Customers" value={String(returningCustomers)} hint="Repeat customer emails" />
+          <KpiCard Icon={Boxes} tone={lowStock ? "amber" : "neutral"} label="Products Low in Stock" value={String(lowStock)} hint={`${outOfStock} out of stock`} />
+          <KpiCard Icon={ClipboardList} tone={pendingOrders ? "amber" : "neutral"} label="Pending Orders" value={String(pendingOrders)} hint="Needs attention" />
+          <KpiCard Icon={ShoppingBag} tone={analytics.summary.abandonedCheckouts ? "rose" : "neutral"} label="Abandoned Checkouts" value={String(analytics.summary.abandonedCheckouts)} hint={comparisonText(analytics.comparison.abandonedCheckouts) || "Started or abandoned"} />
+          <KpiCard Icon={ShoppingBag} label="Products" value={String(products.length)} hint={`${activeProducts} active, ${draftProducts} draft`} />
+        </div>
+
+        <div className="mt-6 grid gap-4 xl:grid-cols-3">
+          <AdminPanel title="Sales" action={<span className="text-xs font-bold text-neutral-500">7d / 30d / 90d / custom</span>}>
+            <SimpleBarChart rows={revenueByDay} />
+          </AdminPanel>
+          <AdminPanel title="Orders by day">
+            <SimpleBarChart rows={ordersByDay} />
+          </AdminPanel>
+          <AdminPanel title="Visitors by day">
+            <SimpleBarChart rows={(analytics.visitsByDay || []).slice(-8).map((row) => ({ label: row.date.slice(5), value: row.count }))} />
+          </AdminPanel>
+          <AdminPanel title="Device breakdown">
+            <SimpleBarChart rows={(analytics.deviceBreakdown || []).map((row) => ({ label: row.label, value: row.count }))} />
+          </AdminPanel>
+          <AdminPanel title="Traffic sources">
+            <SimpleBarChart rows={(analytics.topTrafficSources || []).map((row) => ({ label: row.label, value: row.count }))} />
+          </AdminPanel>
+          <AdminPanel title="Best selling products">
+            <SimpleBarChart rows={bestSellingProducts} />
+          </AdminPanel>
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_360px]">
-          <section className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold">Recent products</h2>
-              <Link href="/admin/products" className="text-sm font-bold text-blue-700">View all</Link>
-            </div>
+          <AdminPanel title="Recent products" action={<Link href="/admin/products" className="text-sm font-bold text-blue-700">View all</Link>}>
             {products.length ? (
               <div className="mt-4 divide-y divide-black/10">
                 {products.slice(0, 6).map((product) => (
@@ -161,19 +200,13 @@ export default function AdminDashboardPage() {
                 ))}
               </div>
             ) : (
-              <div className="mt-4">
-                <EmptyPanel Icon={ShoppingBag} title="No products yet" text="Create your first product to start selling on the storefront." />
-              </div>
+              <p className="rounded-xl border border-dashed border-black/10 p-8 text-center text-sm text-neutral-500">Create your first product to start selling on the storefront.</p>
             )}
-          </section>
+          </AdminPanel>
 
           <div className="space-y-4">
             {realOrders.length ? (
-              <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-bold">Recent orders</h2>
-                  <Link href="/admin/orders" className="text-sm font-bold text-blue-700">View all</Link>
-                </div>
+              <AdminPanel title="Recent orders" action={<Link href="/admin/orders" className="text-sm font-bold text-blue-700">View all</Link>}>
                 <div className="mt-3 divide-y divide-black/10">
                   {realOrders.slice(0, 4).map((order) => (
                     <div key={order.id} className="py-3">
@@ -182,22 +215,16 @@ export default function AdminDashboardPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </AdminPanel>
             ) : (
-              <EmptyPanel Icon={ClipboardList} title="No orders yet" text="Orders will appear here after customers checkout." />
+              <AdminPanel title="Recent orders"><p className="text-sm text-neutral-500">Orders will appear here after customers checkout.</p></AdminPanel>
             )}
-            <EmptyPanel Icon={Users} title={realOrders.length ? "Customers active" : "No customers yet"} text={realOrders.length ? "Customer profiles are being created from confirmed orders." : "Customer profiles will appear as orders come in."} />
-            <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
+            <AdminPanel title="Inventory watch">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-1 text-amber-600" size={20} />
-                <div>
-                  <h2 className="font-bold">Inventory watch</h2>
-                  <p className="mt-1 text-sm text-neutral-500">{lowStock ? `${lowStock} product needs attention.` : "No low-stock products right now."}</p>
-                </div>
+                <p className="text-sm text-neutral-500">{lowStock ? `${lowStock} product needs attention.` : "No low-stock products right now."}</p>
               </div>
-            </div>
-            <EmptyPanel Icon={CreditCard} title="No payment data" text="Payments will appear after live orders are placed." />
-            <EmptyPanel Icon={Boxes} title="Inventory movements empty" text="Stock changes are tracked as products are edited." />
+            </AdminPanel>
           </div>
         </div>
       </div>
