@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { OrderStatus, PaymentStatus } from "@/lib/generated/prisma/client";
 import { orderInclude, serializeOrder } from "@/lib/checkout-db";
+import { sendAdminNewOrderAlert, sendOrderConfirmationEmail, sendPaymentSuccessfulEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { verifyRazorpaySignature } from "@/lib/razorpay";
 
@@ -87,9 +88,18 @@ export async function POST(request: Request) {
       });
     }
 
+    const serializedOrder = serializeOrder(paidOrder);
+    if (!wasAlreadyPaid) {
+      await Promise.all([
+        sendPaymentSuccessfulEmail(serializedOrder),
+        sendOrderConfirmationEmail(serializedOrder),
+        sendAdminNewOrderAlert(serializedOrder)
+      ]);
+    }
+
     return NextResponse.json({
       verified: true,
-      order: serializeOrder(paidOrder)
+      order: serializedOrder
     });
   } catch (error) {
     console.error("Razorpay verify failed", error);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { orderUpdateData } from "@/lib/admin-orders";
 import { orderInclude, serializeOrder } from "@/lib/checkout-db";
+import { sendOrderUpdateEmails } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -29,13 +30,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   try {
     const body = (await request.json()) as Record<string, unknown>;
+    const previousOrder = await prisma.order.findUnique({ where: { id }, include: orderInclude });
+    const serializedPreviousOrder = previousOrder ? serializeOrder(previousOrder) : null;
     const order = await prisma.order.update({
       where: { id },
       data: orderUpdateData(body),
       include: orderInclude
     });
+    const serializedOrder = serializeOrder(order);
 
-    return NextResponse.json(serializeOrder(order));
+    await sendOrderUpdateEmails(serializedPreviousOrder, serializedOrder, body);
+
+    return NextResponse.json(serializedOrder);
   } catch (error) {
     console.error("Admin order update failed", error);
     return NextResponse.json({ error: "Could not update order." }, { status: 400 });

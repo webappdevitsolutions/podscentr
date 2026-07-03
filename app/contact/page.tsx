@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import type { FormEvent } from "react";
 import { Mail, MapPin, Phone, Clock } from "lucide-react";
 
 const contactDetails = [
@@ -10,6 +12,41 @@ const contactDetails = [
 ];
 
 export default function ContactPage() {
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [message, setMessage] = useState("");
+
+  async function submitContactForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStatus("sending");
+    setMessage("");
+
+    const formData = new FormData(event.currentTarget);
+    const payload = {
+      name: String(formData.get("name") || ""),
+      email: String(formData.get("email") || ""),
+      phone: String(formData.get("phone") || ""),
+      message: String(formData.get("message") || "")
+    };
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const result = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error || "Could not send your message.");
+      }
+      event.currentTarget.reset();
+      setStatus("sent");
+      setMessage("Thanks, your message has been sent. We also emailed you a confirmation.");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Could not send your message. Please try again.");
+    }
+  }
+
   return (
     <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <p className="text-sm font-black uppercase tracking-[0.22em] text-accent">Contact Us</p>
@@ -19,7 +56,7 @@ export default function ContactPage() {
       </p>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_0.85fr]">
-        <form className="rounded-3xl bg-white p-6 shadow-sm dark:bg-white/5">
+        <form onSubmit={submitContactForm} className="rounded-3xl bg-white p-6 shadow-sm dark:bg-white/5">
           <h2 className="text-2xl font-black">Send us a message</h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <input name="name" placeholder="Name" className="focus-ring min-h-12 rounded-2xl border border-black/10 bg-transparent px-4 dark:border-white/10" />
@@ -27,12 +64,13 @@ export default function ContactPage() {
             <input name="phone" inputMode="tel" placeholder="Phone" className="focus-ring min-h-12 rounded-2xl border border-black/10 bg-transparent px-4 dark:border-white/10 sm:col-span-2" />
             <textarea name="message" placeholder="Message" className="focus-ring min-h-36 rounded-2xl border border-black/10 bg-transparent p-4 dark:border-white/10 sm:col-span-2" />
           </div>
-          <button type="button" className="focus-ring mt-4 rounded-full bg-accent px-6 py-3 font-bold text-white">
-            Send message
+          <button type="submit" disabled={status === "sending"} className="focus-ring mt-4 rounded-full bg-accent px-6 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-60">
+            {status === "sending" ? "Sending..." : "Send message"}
           </button>
-          <p className="mt-3 text-xs leading-6 text-neutral-500">
-            This form records your message request in the browser only for now. For urgent support, call or email us directly.
-          </p>
+          {message ? (
+            <p className={`mt-3 text-sm font-semibold ${status === "error" ? "text-red-600" : "text-emerald-600"}`}>{message}</p>
+          ) : null}
+          <p className="mt-3 text-xs leading-6 text-neutral-500">For urgent support, call or email us directly.</p>
         </form>
 
         <div className="grid gap-4">

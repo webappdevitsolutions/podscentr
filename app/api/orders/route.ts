@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { OrderStatus, PaymentStatus, Prisma } from "@/lib/generated/prisma/client";
 import { createCheckoutOrder, orderInclude, serializeOrder, type CheckoutPayload } from "@/lib/checkout-db";
 import { resolveDateRange } from "@/lib/date-range";
+import { sendAdminNewOrderAlert, sendOrderConfirmationEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -82,8 +83,11 @@ export async function POST(request: Request) {
       paymentStatus: "COD_PENDING",
       orderStatus: OrderStatus.Confirmed
     });
+    const serializedOrder = serializeOrder(order);
 
-    return NextResponse.json({ order: serializeOrder(order) }, { status: 201 });
+    await Promise.all([sendOrderConfirmationEmail(serializedOrder), sendAdminNewOrderAlert(serializedOrder)]);
+
+    return NextResponse.json({ order: serializedOrder }, { status: 201 });
   } catch (error) {
     console.error("Create COD order failed", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Could not place order." }, { status: 400 });
